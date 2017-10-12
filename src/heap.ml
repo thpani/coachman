@@ -189,10 +189,25 @@ let rec convert ?(indent=0) init_heap cfg =
           | Assume Neg Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) = (VarMap.find id2 from_heap.var) -> ()
           | _ ->
             let to_vertex = to_, to_heap in
+            Printf.printf "%s (%s) " (dump_cloc to_vertex) (Ast.pprint ~sep: "; " tstmt) ;
+            let isomorphic_structures = find_isomorphic_heap g tstmt to_vertex in
+            let isomorphic_structures_num = List.length isomorphic_structures in
+            let tstmt, to_heap = match isomorphic_structures with
+              | isomorphic_structure :: tl ->
+                  let f, t, structure = isomorphic_structure in
+                  let rewritten_stmt = reduce_seq_commands [ tstmt ; Asgn (ctr_of_node t, Id (ctr_of_node f)) ] in
+                  rewritten_stmt, structure
+              | _ -> tstmt, to_heap
+            in
+            let to_vertex = to_, to_heap in
             let has_to_vertex = G.mem_vertex g to_vertex in
-              Printf.printf "%s (%s)\n" (dump_cloc to_vertex) (Ast.pprint ~sep: "; " tstmt) ;
-              G.add_edge_e g (from_vertex, tstmt, to_vertex) ;
-              if not has_to_vertex then Queue.add to_vertex q
+            if isomorphic_structures_num > 0 then
+              Printf.printf " ~ %s [out of %d isomorphic structures]\n" (dump_cloc to_vertex) isomorphic_structures_num
+            else
+              Printf.printf " [0 isomorphic structures found]\n"
+            ;
+            G.add_edge_e g (from_vertex, tstmt, to_vertex) ;
+            if not has_to_vertex then Queue.add to_vertex q
         ) translated
         end
       ) cfg from
