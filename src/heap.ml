@@ -146,6 +146,30 @@ let reduce_seq_commands seq =
     | _ -> Atomic reduced
   in
   reduced
+
+let find_isomorphic_heap g stmt to_vertex =
+  let to_ploc, heap = to_vertex in
+  let max_elt = NodeSet.max_elt heap.nodes in
+  let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
+  let enumerated_max = List.fold_left (fun set elt -> NodeSet.add elt set) NodeSet.empty (1--max_elt) in
+  let novel_nodes = NodeSet.diff enumerated_max heap.nodes in
+  let isomorphic_structures = List.map (fun novel_node ->
+    let rewrites = List.map (fun potentially_discarded_node -> potentially_discarded_node, novel_node) (NodeSet.elements heap.nodes) in
+    let rename_structure h from to_ =
+      let rename_node node = if node = from then to_ else node in
+      let nodes = NodeSet.map rename_node h.nodes in
+      let succ = List.fold_left (fun map (f,t) -> SuccMap.add (rename_node f) (rename_node t) map) SuccMap.empty (SuccMap.bindings h.succ) in
+      let var = List.fold_left (fun map (f,t) -> VarMap.add f (rename_node t) map) VarMap.empty (VarMap.bindings h.var) in
+      { nodes ; succ ; var }
+    in
+    let isomporphic_structure_candidates = List.map (fun (f,t) -> f, t, rename_structure heap f t) rewrites in
+    let isomorphic_structures = List.filter (fun (f, t, structure) ->
+      (* Printf.printf "\nCHECKING FOR ISOMORPHISM %s ~ %s\n" (dump_cloc to_vertex) (dump_cloc (to_ploc, structure)) ; *)
+      G.mem_vertex g (to_ploc, structure)) isomporphic_structure_candidates in
+    isomorphic_structures
+  ) (NodeSet.elements novel_nodes) in
+  List.concat isomorphic_structures
+
 let rec convert ?(indent=0) init_heap cfg =
   let g = G.create () in
   let q = Queue.create () in
@@ -350,26 +374,5 @@ and l2ca hfrom stmt =
       let path_stmts_seq = List.map (fun (path,_) -> List.map (fun (from, stmt, to_) -> stmt) path) paths in
       let path_stmts_seq_filtered = List.map reduce_seq_commands path_stmts_seq in
       print_string "  " ; 
-      List.map2 (fun stmt heap -> match stmt with
-        | Asgn (c1, Add(c2, Num n)) -> (* check if heap[c2/c1] = hfrom *)
-            let discarded_nodes = NodeSet.diff hfrom.nodes heap.nodes in
-            let novel_nodes = NodeSet.diff heap.nodes hfrom.nodes in
-            if (NodeSet.cardinal novel_nodes) = 1 && (NodeSet.cardinal discarded_nodes) = 1 then
-              let discarded_node = NodeSet.min_elt discarded_nodes in
-              let novel_node = NodeSet.min_elt novel_nodes in
-              let rename_structure h from to_ =
-                let rename_node node = if node = from then to_ else node in
-                let nodes = NodeSet.map rename_node h.nodes in
-                let succ = List.fold_left (fun map (f,t) -> SuccMap.add (rename_node f) (rename_node t) map) SuccMap.empty (SuccMap.bindings h.succ) in
-                let var = List.fold_left (fun map (f,t) -> VarMap.add f (rename_node t) map) VarMap.empty (VarMap.bindings h.var) in
-                { nodes ; succ ; var }
-              in
-                let renamed_structure = rename_structure heap novel_node discarded_node in
-                if structure_equal renamed_structure hfrom then
-                  Asgn (c2, Add(c2, Num n)), hfrom
-                else
-                  stmt, heap
-            else stmt, heap
-        | _ -> stmt, heap
-      ) path_stmts_seq_filtered final_heaps
+      List.map2 (fun stmt heap -> stmt, heap) path_stmts_seq_filtered final_heaps
   | _ -> assert false
