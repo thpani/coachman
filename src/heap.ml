@@ -118,6 +118,34 @@ let next_free_node nodes =
   in
   x_next_free_node 1
 
+
+let reduce_seq_commands seq =
+  (* Filter assume(true); *)
+  let filter_assume_true seq = List.filter (fun stmt -> match stmt with Assume True -> false | _ -> true) seq in
+  (* Filter idempotent assignments *)
+  let rec filter_succ_ass seq = match seq with
+    | Asgn (c1, Num n1) :: (Asgn (c2, Num n2) :: rest) when c1 = c2 -> filter_succ_ass (Asgn (c2, Num n2) :: rest)
+    | s1 :: rest -> s1 :: (filter_succ_ass rest)
+    | [] -> []
+  in
+  (* Constant propagation *)
+  let rec propagate_constants seq = match seq with
+    | [ Asgn (c1, expr1) ; Asgn (c2, Id c3) ] when c1 = c3 -> [ Asgn (c2, expr1) ]
+    | s1 :: (s2 :: rest) -> begin
+        match s1, s2 with
+        | Asgn (c1, Num n), Asgn (c2, Add (c3, Id c4)) when c1 = c3 -> Asgn (c2, Add(c4, Num n)) :: (propagate_constants rest)
+        | _ -> propagate_constants (s2 :: rest)
+    end
+    | s1 :: rest -> s1 :: (propagate_constants rest)
+    | [] -> []
+  in
+  let reduced = propagate_constants (filter_succ_ass (filter_assume_true seq)) in
+  let reduced = match List.length reduced with
+    | 0 -> Assume True
+    | 1 -> List.hd reduced
+    | _ -> Atomic reduced
+  in
+  reduced
 let rec convert ?(indent=0) init_heap cfg =
   let g = G.create () in
   let q = Queue.create () in
@@ -320,30 +348,7 @@ and l2ca hfrom stmt =
       ) final_vertices in
       let paths = List.map (fun final -> Dijkstra.shortest_path cfg' (0, hfrom) final) final_vertices in
       let path_stmts_seq = List.map (fun (path,_) -> List.map (fun (from, stmt, to_) -> stmt) path) paths in
-      (* Filter assume(true); *)
-      let filter_assume_true seq = List.filter (fun stmt -> match stmt with Assume True -> false | _ -> true) seq in
-      (* Filter idempotent assignments *)
-      let rec filter_succ_ass seq = match seq with
-        | s1 :: (s2 :: rest) when s1 = s2 -> s1 :: (filter_succ_ass rest)
-        | s1 :: rest -> s1 :: (filter_succ_ass rest)
-        | [] -> []
-      in
-      (* Constant propagation *)
-      let rec propagate_constants seq = match seq with
-        | s1 :: (s2 :: rest) -> begin
-            match s1, s2 with
-            | Asgn (c1, Num n), Asgn (c2, Add (c3, Id c4)) when c1 = c3 -> Asgn (c2, Add(c4, Num n)) :: (propagate_constants rest)
-            | _ -> propagate_constants (s2 :: rest)
-        end
-        | s1 :: rest -> s1 :: (propagate_constants rest)
-        | [] -> []
-      in
-      let path_stmts_seq_filtered = List.map (fun path -> propagate_constants (filter_succ_ass (filter_assume_true path)))  path_stmts_seq in
-      let path_stmts_seq_filtered = List.map (fun path -> match List.length path with
-        | 0 -> Assume True
-        | 1 -> List.hd path
-        | _ -> Atomic path
-      ) path_stmts_seq_filtered in
+      let path_stmts_seq_filtered = List.map reduce_seq_commands path_stmts_seq in
       print_string "  " ; 
       List.map2 (fun stmt heap -> match stmt with
         | Asgn (c1, Add(c2, Num n)) -> (* check if heap[c2/c1] = hfrom *)
