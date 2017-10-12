@@ -40,11 +40,11 @@ let () =
   | Some ast, Some ast_summ -> begin
       let cfg = gen_cfg ast in
       let cfg = Cfg.add_summaries cfg (List.hd ast_summ) in
-      let chout = open_out (Sys.argv.(1) ^ ".dot") in
+      let chout = open_out ((Filename.basename Sys.argv.(1)) ^ ".dot") in
         Cfg.Dot.output_graph chout cfg ;
         close_out chout ;
       let bicfg = Heap.convert init_heap cfg in
-      let chout = open_out (Sys.argv.(1) ^ ".bi.dot") in
+      let chout = open_out ((Filename.basename Sys.argv.(1)) ^ ".bi.dot") in
       (* print_string (Ast.pprint_seq ast_summ) ; *)
       Heap.Dot.output_graph chout bicfg ; close_out chout
       ;

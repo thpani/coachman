@@ -54,14 +54,14 @@ test3: native
 	open test3.tiny.bi.dot.pdf
 
 testt: native
-	./main.native treiber.tiny treiber.heap treiber.summaries
+	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber.summaries
 	dot -Tpdf treiber.tiny.dot >treiber.tiny.dot.pdf
 	open treiber.tiny.dot.pdf
 	dot -Tpdf treiber.tiny.bi.dot >treiber.tiny.bi.dot.pdf
 	open treiber.tiny.bi.dot.pdf
 
 testt_emp: native
-	./main.native treiber.tiny treiber.heap empty.summaries
+	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/empty.summaries
 	dot -Tpdf treiber.tiny.dot >treiber.tiny.dot.pdf
 	open treiber.tiny.dot.pdf
 	dot -Tpdf treiber.tiny.bi.dot >treiber.tiny.bi.dot.pdf
