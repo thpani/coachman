@@ -121,13 +121,14 @@ let next_free_node nodes =
 let rec convert ?(indent=0) init_heap cfg =
   let g = G.create () in
   let q = Queue.create () in
+  let indent = String.make indent ' ' in
     G.add_vertex g (0, init_heap) ;
     Queue.add (0, init_heap) q ;
     while not (Queue.is_empty q) do
       let from_vertex = Queue.pop q in
       let from, from_heap = from_vertex in
       Cfg.G.iter_succ_e (fun (from, stmt, to_) -> begin
-        Printf.printf "%s%d -> %d (%s) => %s%s -> " (String.make indent ' ') from to_ (Ast.pprint ~sep:"; " stmt) (String.make indent ' ') (dump_cloc from_vertex) ;
+        Printf.printf "%s%d -> %d (%s) => %s -> " indent from to_ (Ast.pprint ~sep:"; " stmt) (dump_cloc from_vertex) ;
         let translated = l2ca from_heap stmt in
         List.iter (fun (tstmt, to_heap) ->
           (* prune infeasible assume edges *)
