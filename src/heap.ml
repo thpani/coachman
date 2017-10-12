@@ -121,8 +121,8 @@ let next_free_node nodes =
 let rec convert ?(indent=0) init_heap cfg =
   let g = G.create () in
   let q = Queue.create () in
-    Queue.add (0, init_heap) q
-    ;
+    G.add_vertex g (0, init_heap) ;
+    Queue.add (0, init_heap) q ;
     while not (Queue.is_empty q) do
       let from_vertex = Queue.pop q in
       let from, from_heap = from_vertex in
