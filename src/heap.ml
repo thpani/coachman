@@ -42,8 +42,8 @@ let structure_from_heap heap =
   let var = List.fold_left (fun map (id, next, pvar) -> VarMap.add pvar id map) VarMap.empty heap in
   { nodes ; succ ; var }
 
-let dump_str s =
-  String.concat "" [ "nodes: " ; NodeSet.to_string s.nodes ; ", succs: " ; SuccMap.to_string s.succ ; ", vars: " ; VarMap.to_string s.var ]
+let dump_str ?(sep=", ") s =
+  String.concat sep [ "nodes: " ^ NodeSet.to_string s.nodes ; "succs: " ^ SuccMap.to_string s.succ ; "vars: " ^ VarMap.to_string s.var ]
 
 let project_onto s n = (* project s onto n *)
   SuccMap.filter (fun a _ -> NodeSet.mem a n) s
@@ -71,7 +71,7 @@ let ctr_of_node n = Printf.sprintf "x_%d" n
 type ploc = int
 type cloc = ploc * structure
 
-let dump_cloc (p, s) = Printf.sprintf "%d: %s" p (dump_str s)
+let dump_cloc ?(sep=", ") (p, s) = Printf.sprintf "%d:%s%s" p sep (dump_str ~sep s)
 let cloc_equal (a_ploc, a_heap) (b_ploc, b_heap) =
     a_ploc = b_ploc && (structure_equal a_heap b_heap)
 
