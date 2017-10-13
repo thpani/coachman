@@ -13,9 +13,9 @@ module V_ = struct
 end
 
 module E_ = struct
-  type t = Ast.stmt
+  type t = Ast.stmt * int
   let compare = compare
-  let default = Assume(True)
+  let default = Assume True, 0
 end
 
 module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
@@ -49,7 +49,7 @@ let rewrite_guard = function
   | g -> g
 
 let rec reduce_cfg_assumes g =
-  G.iter_edges_e (fun (from, stmt, to_) -> 
+  G.iter_edges_e (fun (from, (stmt, _), to_) -> 
       match stmt with
       | Assume False ->
           (* Printf.printf "rem1 %d -> %d\n" from to_ ; *)
@@ -73,17 +73,17 @@ let rec reduce_cfg_assumes g =
 let reduce_cfg g =
   (* Rewrite CAS as atomic assume/assign *)
   (* Basic rewriting of guards (boolean simplification *)
-  G.iter_edges_e (fun (from, stmt, to_) -> 
+  G.iter_edges_e (fun (from, (stmt, summary), to_) -> 
     match stmt with
     | Assume CAS (a,b,c) ->
         G.remove_edge g from to_ ;
-        G.add_edge_e g (from, Atomic [ Assume(Eq(a, Id b)) ; AsgnNull a ; Asgn(a, Id c) ], to_)
+        G.add_edge_e g (from, (Atomic [ Assume(Eq(a, Id b)) ; AsgnNull a ; Asgn(a, Id c) ], summary), to_)
     | Assume Neg CAS (a,b,c) ->
         G.remove_edge g from to_ ;
-        G.add_edge_e g (from, Atomic [ Assume(Neg(Eq(a,Id b))) ], to_)
+        G.add_edge_e g (from, (Atomic [ Assume(Neg(Eq(a,Id b))) ], summary), to_)
     | Assume guard ->
         G.remove_edge g from to_ ;
-        G.add_edge_e g (from, Assume(rewrite_guard guard), to_)
+        G.add_edge_e g (from, (Assume(rewrite_guard guard), summary), to_)
     | _ -> ()
   ) g
   ;
@@ -114,7 +114,7 @@ let ast_to_cfg ?(reduce=true) ast =
             last := last_before_if ;
             x_ast_to_cfg selse ;
             let nv = if !did_break then next_vertex g else !last_after_if in
-              G.add_edge_e g (!last, Ast.Assume(Ast.True), nv) ;
+              G.add_edge_e g (!last, (Ast.Assume(Ast.True), 0), nv) ;
               did_break := false ;
               last := nv
       | Ast.While(guard, stmts) ->
@@ -122,16 +122,16 @@ let ast_to_cfg ?(reduce=true) ast =
           let after_branch = next_vertex g in
           let stmts = Ast.Assume(guard) :: stmts in
           break_target := after_branch ;
-          G.add_edge_e g (!last, Ast.Assume(Ast.Neg(guard)), after_branch) ;
+          G.add_edge_e g (!last, (Ast.Assume(Ast.Neg(guard)), 0), after_branch) ;
           x_ast_to_cfg stmts ;
-          G.add_edge_e g (!last, Ast.Assume(Ast.True), before_branch) ;
+          G.add_edge_e g (!last, (Ast.Assume(Ast.True), 0), before_branch) ;
           last := max_vertex g
       | Ast.Break ->
-          G.add_edge_e g (!last, Ast.Assume(Ast.True), !break_target) ;
+          G.add_edge_e g (!last, (Ast.Assume(Ast.True), 0), !break_target) ;
           did_break := true
       | stmt ->
         let next_v = next_vertex g in
-          G.add_edge_e g (!last, stmt, next_v) ; last := next_v
+          G.add_edge_e g (!last, (stmt, 0), next_v) ; last := next_v
         )
     ast
   in
@@ -139,4 +139,4 @@ let ast_to_cfg ?(reduce=true) ast =
   if reduce then reduce_cfg g else g
 
 let add_summaries cfg summary =
-  G.iter_vertex (fun v -> G.add_edge_e cfg (v, summary, v)) cfg ; cfg
+  G.iter_vertex (fun v -> G.add_edge_e cfg (v, (summary, 1), v)) cfg ; cfg

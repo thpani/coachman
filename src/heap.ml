@@ -82,10 +82,12 @@ module V_ = struct
   let equal = cloc_equal
 end
 
+type cfg_edge = Cfg.V_.t * Cfg.E_.t * Cfg.V_.t
+
 module E_ = struct
-  type t = Ast.stmt
+  type t = Ast.stmt * cfg_edge
   let compare = compare
-  let default = Assume(True)
+  let default = Assume True, (0, (Assume True, 0), 0)
 end
 
 module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
