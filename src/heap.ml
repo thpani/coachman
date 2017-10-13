@@ -163,22 +163,30 @@ let find_isomorphic_heap g stmt to_vertex =
   let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
   let enumerated_max = List.fold_left (fun set elt -> NodeSet.add elt set) NodeSet.empty (1--max_elt) in
   let novel_nodes = NodeSet.diff enumerated_max heap.nodes in
+  let rename_structure h from to_ =
+    let rename_node node = if node = from then to_ else node in
+    let nodes = NodeSet.map rename_node h.nodes in
+    let succ = List.fold_left (fun map (f,t) -> SuccMap.add (rename_node f) (rename_node t) map) SuccMap.empty (SuccMap.bindings h.succ) in
+    let var = List.fold_left (fun map (f,t) -> VarMap.add f (rename_node t) map) VarMap.empty (VarMap.bindings h.var) in
+    { nodes ; succ ; var }
+  in
   let isomorphic_structures = List.map (fun novel_node ->
     let rewrites = List.map (fun potentially_discarded_node -> potentially_discarded_node, novel_node) (NodeSet.elements heap.nodes) in
-    let rename_structure h from to_ =
-      let rename_node node = if node = from then to_ else node in
-      let nodes = NodeSet.map rename_node h.nodes in
-      let succ = List.fold_left (fun map (f,t) -> SuccMap.add (rename_node f) (rename_node t) map) SuccMap.empty (SuccMap.bindings h.succ) in
-      let var = List.fold_left (fun map (f,t) -> VarMap.add f (rename_node t) map) VarMap.empty (VarMap.bindings h.var) in
-      { nodes ; succ ; var }
-    in
     let isomporphic_structure_candidates = List.map (fun (f,t) -> f, t, rename_structure heap f t) rewrites in
-    let isomorphic_structures = List.filter (fun (f, t, structure) ->
-      (* Printf.printf "\nCHECKING FOR ISOMORPHISM %s ~ %s\n" (dump_cloc to_vertex) (dump_cloc (to_ploc, structure)) ; *)
-      G.mem_vertex g (to_ploc, structure)) isomporphic_structure_candidates in
+    let isomorphic_structures = List.filter (fun (f, t, structure) -> G.mem_vertex g (to_ploc, structure)) isomporphic_structure_candidates in
     isomorphic_structures
   ) (NodeSet.elements novel_nodes) in
-  List.concat isomorphic_structures
+  let isomorphic_structures = List.concat isomorphic_structures in
+  if (List.length isomorphic_structures) > 0 then
+    (* isomorphic structures found in the graph *)
+    isomorphic_structures, true
+  else if (NodeSet.cardinal novel_nodes) > 0 then
+    (* no isomorphic structures found; still rename the max node *)
+    let novel_node = NodeSet.min_elt novel_nodes in
+    [ max_elt, novel_node, rename_structure heap max_elt novel_node ], false
+  else
+    (* no isomorphic structures found; no renaming possible (|nodes| = max {nodes}) *)
+    [], false
 
 let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
   let g = G.create () in
