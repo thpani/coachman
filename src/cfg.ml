@@ -21,16 +21,21 @@ end
 module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
 module GChecker = Path.Check(G)
 
-module Dot = Graphviz.Dot (struct
+module Dot_ = Graphviz.Dot (struct
   include G
   let vertex_name v = "\"" ^ (string_of_int v) ^  "\""
   let graph_attributes _ = []
   let default_vertex_attributes _ = []
   let vertex_attributes _ = []
   let default_edge_attributes _ = []
-  let edge_attributes (v1, e, v2) = [`Label (Ast.pprint ~atomic_angles:false e)]
+  let edge_attributes (v1, (stmt, summary), v2) = [`Label (Ast.pprint ~atomic_angles:false stmt) ; `Color (if summary > 0 then 0xff0000 else 0)]
   let get_subgraph _ = None
 end)
+
+module Dot = struct
+  include Dot_
+  let write_dot g path = let chout = open_out path in Dot_.output_graph chout g ; close_out chout
+end
 
 let max_vertex g = G.fold_vertex (fun v a -> max v a) g 0
 let next_vertex g = (max_vertex g) + 1
