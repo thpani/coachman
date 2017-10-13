@@ -118,7 +118,6 @@ let next_free_node nodes =
   in
   x_next_free_node 1
 
-
 let reduce_seq_commands seq =
   (* Filter assume(true); *)
   let filter_assume_true seq = List.filter (fun stmt -> match stmt with Assume True -> false | _ -> true) seq in
@@ -170,7 +169,7 @@ let find_isomorphic_heap g stmt to_vertex =
   ) (NodeSet.elements novel_nodes) in
   List.concat isomorphic_structures
 
-let rec convert ?(indent=0) init_heap cfg =
+let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
   let g = G.create () in
   let q = Queue.create () in
   let indent = String.make indent ' ' in
@@ -179,18 +178,13 @@ let rec convert ?(indent=0) init_heap cfg =
     while not (Queue.is_empty q) do
       let from_vertex = Queue.pop q in
       let from, from_heap = from_vertex in
-      Cfg.G.iter_succ_e (fun (from, stmt, to_) -> begin
+      Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
         Printf.printf "%s%d -> %d (%s) => %s -> " indent from to_ (Ast.pprint ~sep:"; " stmt) (dump_cloc from_vertex) ;
         let translated = l2ca from_heap stmt in
         List.iter (fun (tstmt, to_heap) ->
-          (* prune infeasible assume edges *)
-          match tstmt with
-          | Assume Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) <> (VarMap.find id2 from_heap.var) -> ()
-          | Assume Neg Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) = (VarMap.find id2 from_heap.var) -> ()
-          | _ ->
             let to_vertex = to_, to_heap in
-            Printf.printf "%s (%s) " (dump_cloc to_vertex) (Ast.pprint ~sep: "; " tstmt) ;
-            let isomorphic_structures = find_isomorphic_heap g tstmt to_vertex in
+            Printf.printf "%s (%s)" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) ;
+            let isomorphic_structures, found_isomorphic = find_isomorphic_heap g tstmt to_vertex in
             let isomorphic_structures_num = List.length isomorphic_structures in
             let tstmt, to_heap = match isomorphic_structures with
               | isomorphic_structure :: tl ->
@@ -200,14 +194,26 @@ let rec convert ?(indent=0) init_heap cfg =
               | _ -> tstmt, to_heap
             in
             let to_vertex = to_, to_heap in
-            let has_to_vertex = G.mem_vertex g to_vertex in
-            if isomorphic_structures_num > 0 then
-              Printf.printf " ~ %s [out of %d isomorphic structures]\n" (dump_cloc to_vertex) isomorphic_structures_num
-            else
-              Printf.printf " [0 isomorphic structures found]\n"
-            ;
-            G.add_edge_e g (from_vertex, tstmt, to_vertex) ;
-            if not has_to_vertex then Queue.add to_vertex q
+            (* prune infeasible assume edges *)
+            let tstmt = match tstmt with
+            | Assume Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) <> (VarMap.find id2 from_heap.var) -> Assume False
+            | Assume Neg Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) = (VarMap.find id2 from_heap.var) -> Assume False
+            | _ -> tstmt
+            in
+            if prune_infeasible && tstmt = (Assume False) then ()
+            else begin
+              let has_to_vertex = G.mem_vertex g to_vertex in
+              if isomorphic_structures_num > 0 then
+                if found_isomorphic then
+                  Printf.printf " ~ %s (%s) [out of %d isomorphic structures]\n" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) isomorphic_structures_num
+                else
+                  Printf.printf " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (Ast.pprint ~sep:"; " tstmt) (dump_cloc to_vertex)
+              else
+                Printf.printf " [0 isomorphic structures found]\n"
+              ;
+              G.add_edge_e g (from_vertex, (tstmt, (from, (stmt, summary), to_)), to_vertex) ;
+              if not has_to_vertex then Queue.add to_vertex q
+            end
         ) translated
         end
       ) cfg from
@@ -379,14 +385,19 @@ and l2ca hfrom stmt =
   | Atomic stmts  -> 
       Printf.printf "\n  ATOMIC TRANSITION COMPUTATION:\n" ;
       let cfg = Cfg.ast_to_cfg stmts in
-      let cfg' = convert ~indent:2 hfrom cfg in
+      (* don't prune infeasible edges on atomic transition computation;
+       * otherwise we end up with an incorrect final vertex.
+       * the infeasible stmt will later be reduced. *)
+      let cfg' = convert ~indent:2 ~prune_infeasible:false hfrom cfg in
       let final_vertices = G.fold_vertex (fun v l -> match G.succ cfg' v with [] -> v :: l | _ -> l) cfg' [] in
+      (* List.iter (fun (vertex,_) -> Printf.printf "FINAL VERTEX: %d\n" vertex) final_vertices ; *)
       let final_heaps = List.map (fun (ploc,heap) -> 
         let var = VarMap.filter (fun v n -> v <> "node") heap.var in
         { nodes = heap.nodes ; succ = heap.succ ; var }
       ) final_vertices in
       let paths = List.map (fun final -> Dijkstra.shortest_path cfg' (0, hfrom) final) final_vertices in
-      let path_stmts_seq = List.map (fun (path,_) -> List.map (fun (from, stmt, to_) -> stmt) path) paths in
+      let path_stmts_seq = List.map (fun (path,_) -> List.map (fun (from, (stmt,_), to_) -> stmt) path) paths in
+      (* List.iter (fun path -> Printf.printf "LEN PATH: %d\n" (List.length path)) path_stmts_seq ; *)
       let path_stmts_seq_filtered = List.map reduce_seq_commands path_stmts_seq in
       print_string "  " ; 
       List.map2 (fun stmt heap -> stmt, heap) path_stmts_seq_filtered final_heaps
