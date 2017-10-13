@@ -413,3 +413,6 @@ and l2ca hfrom stmt =
       print_string "  " ; 
       List.map2 (fun stmt heap -> stmt, heap) path_stmts_seq_filtered final_heaps
   | _ -> assert false
+
+let remove_summary_edges g =
+  G.iter_edges_e (fun (f, e, t) -> let _, (_, (_, summary),_) = e in if summary > 0 then G.remove_edge_e g (f, e, t)) g
