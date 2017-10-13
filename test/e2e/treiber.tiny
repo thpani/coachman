@@ -1,0 +1,8 @@
+newHead := new;
+while true do
+  oldHead := ToS;
+  newHead.next := oldHead;
+  if CAS(ToS, oldHead, newHead) then
+    break;
+  fi
+od

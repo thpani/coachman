@@ -1,0 +1,3 @@
+a := new ;
+b := new ;
+b.next := a ;
