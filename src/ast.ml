@@ -9,6 +9,7 @@ type guard =
   | Eq of identifier * expr
   | Gt of identifier * expr
   | EqNull of identifier
+  | NextEqNull of identifier
   | Neg of guard
   | True
   | False
@@ -45,6 +46,7 @@ let rec pprint_guard = function
   | Eq (id, expr) -> id ^ " = " ^ (pprint_expr expr)
   | Gt (id, expr) -> id ^ " > " ^ (pprint_expr expr)
   | EqNull id -> id ^ " = null"
+  | NextEqNull id -> id ^ ".next = null"
   | Neg g -> "!(" ^ (pprint_guard g) ^ ")"
   | True -> "true"
   | False -> "false"

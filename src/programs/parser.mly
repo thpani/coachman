@@ -74,6 +74,7 @@ asgn:
 guard:
   | ID EQ ID    { Eq($1, Id $3) }
   | ID EQ NULL  { EqNull($1) }
+  | ID DOT NEXT EQ NULL  { NextEqNull($1) }
   | NEG LPAREN guard RPAREN   { Neg($3) }
   | TRUE  { True }
   | FALSE { False }

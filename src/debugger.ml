@@ -9,7 +9,7 @@ let string_of_lvl = function
   | Warn -> "warn"
   | Info -> "info"
 
-let current_level = ref (ord Warn)
+let current_level = ref (ord Info)
 
 let logf lvl =
   if ord lvl >= !current_level then printf else ifprintf stdout

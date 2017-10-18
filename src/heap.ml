@@ -283,6 +283,8 @@ let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
             | Assume Neg Eq (id1, Id id2) -> Assume (ttolit ((VarMap.find id1 from_heap.var) <> (VarMap.find id2 from_heap.var)))
             | Assume EqNull id            -> Assume (ttolit ((VarMap.find id from_heap.var) = 0))
             | Assume Neg EqNull id        -> Assume (ttolit ((VarMap.find id from_heap.var) <> 0))
+            | Assume NextEqNull id        -> Assume (ttolit ((SuccMap.find (VarMap.find id from_heap.var) from_heap.succ) = 0))
+            | Assume Neg NextEqNull id    -> Assume (ttolit ((SuccMap.find (VarMap.find id from_heap.var) from_heap.succ) <> 0))
             | _ -> tstmt
             in
             Debugger.logf Debugger.Info "%s%s%s (%s)" indent indent (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) ;
