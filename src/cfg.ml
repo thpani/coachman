@@ -140,5 +140,5 @@ let ast_to_cfg ?(reduce=true) ast =
 
 let add_summaries cfg summaries =
   List.iteri (fun i (summary_name, summary) ->
-    G.iter_vertex (fun v -> G.add_edge_e cfg (v, (Atomic summary, i+1), v)) cfg
+    G.iter_vertex (fun v -> G.add_edge_e cfg (v, (Atomic (Ast.unwrap_atomic summary), i+1), v)) cfg
   ) summaries

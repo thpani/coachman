@@ -68,6 +68,11 @@ and pprint ?(sep=";\n") ?(atomic_angles=true) stmt = match stmt with
   | Break -> "break"
   | CAS (id1, id2, id3) -> Printf.sprintf "CAS(%s, %s, %s)" id1 id2 id3
 
+let rec unwrap_atomic = function
+  | Atomic s :: tl -> (unwrap_atomic s) @ (unwrap_atomic tl)
+  | s1       :: tl -> s1 :: (unwrap_atomic tl)
+  | []             -> []
+
 (* Each pointer assignment of the form u := new, u := w, or u := w.next is
  * immediately preceded by an assignment of the form u := null. A pointer
  * assignment of the form u := u.next is turned into v := u; u := null; u :=

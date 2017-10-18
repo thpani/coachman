@@ -1,7 +1,5 @@
 def push begin
-<
   __node := new;
   __node.next := ToS;
   ToS := __node;
-> ;
 end

@@ -490,11 +490,6 @@ and l2ca hfrom stmt =
       ) final_vertices in
       let paths = List.map (fun final -> Dijkstra.shortest_path cfg' (0, hfrom) final) final_vertices in
       let path_stmts_seq = List.map (fun (path,_) -> List.map (fun (from, (stmt,_), to_) -> stmt) path) paths in
-      let rec unwrap_atomic seq = match seq with
-        | Atomic s :: rest -> (unwrap_atomic s) @ (unwrap_atomic rest)
-        | s1 :: rest -> s1 :: (unwrap_atomic rest)
-        | [] -> []
-      in
       let path_stmts_seq = List.map unwrap_atomic path_stmts_seq in
       (* List.iter (fun path -> Printf.printf "LEN PATH: %d\n" (List.length path)) path_stmts_seq ; *)
       (* List.iter (fun path -> print_endline (Ast.pprint_seq ~sep:"; " path)) path_stmts_seq ; *)
