@@ -46,14 +46,6 @@ let next_vertex g = (max_vertex g) + 1
 let rewrite_guard = function
   | Neg True -> False
   | Neg False -> True
-  | Neg Eq (a,b) -> begin match b with
-      | Id b when a = b -> False
-      | _ -> Neg (Eq (a,b))
-    end
-  | Eq (a,b) -> begin match b with 
-      | Id b when a = b -> True
-      | _ -> Eq (a,b)
-    end
   | g -> g
 
 let rec reduce_cfg_assumes g =
@@ -122,7 +114,7 @@ let ast_to_cfg ?(reduce=true) ast =
             last := last_before_if ;
             x_ast_to_cfg selse ;
             let nv = if !did_break then next_vertex g else !last_after_if in
-              G.add_edge_e g (!last, (Ast.Assume(Ast.True), 0), nv) ;
+              G.add_edge_e g (!last, (Ast.Assume True, 0), nv) ;
               did_break := false ;
               last := nv
       | Ast.While(guard, stmts) ->
@@ -132,10 +124,10 @@ let ast_to_cfg ?(reduce=true) ast =
           break_target := after_branch ;
           G.add_edge_e g (!last, (Ast.Assume(Ast.Neg(guard)), 0), after_branch) ;
           x_ast_to_cfg stmts ;
-          G.add_edge_e g (!last, (Ast.Assume(Ast.True), 0), before_branch) ;
+          G.add_edge_e g (!last, (Ast.Assume True, 0), before_branch) ;
           last := max_vertex g
       | Ast.Break ->
-          G.add_edge_e g (!last, (Ast.Assume(Ast.True), 0), !break_target) ;
+          G.add_edge_e g (!last, (Ast.Assume True, 0), !break_target) ;
           did_break := true
       | stmt ->
         let next_v = next_vertex g in
