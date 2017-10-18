@@ -73,5 +73,3 @@ testms: testms_emp testms_enq testms_deq testms_enq_deq
 dot_testms:
 	dot -Tpdf ms.tiny.enq.dot >ms.tiny.enq.dot.pdf && open ms.tiny.enq.dot.pdf
 	dot -Tpdf ms.tiny.enq.bi.dot >ms.tiny.enq.bi.dot.pdf && open ms.tiny.enq.bi.dot.pdf
-	dot -Tpdf ms.tiny.deq.dot >ms.tiny.deq.dot.pdf && open ms.tiny.deq.dot.pdf
-	dot -Tpdf ms.tiny.deq.bi.dot >ms.tiny.deq.bi.dot.pdf && open ms.tiny.deq.bi.dot.pdf
