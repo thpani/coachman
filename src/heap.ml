@@ -350,7 +350,7 @@ and l2ca hfrom stmt =
       assert (vu = 0) ;
       assert (vw <> 0) ; (* A6 *)
         [ Assume (Eq (ctr_n, Num 1)), { nodes = hfrom.nodes ; succ = hfrom.succ; var = var1 } ; 
-          Atomic [Assume (Gt (ctr_n, Num 1)); Asgn (ctr_m, Add (ctr_n, Num (-1)))], split { nodes = hfrom.nodes; succ = hfrom.succ; var = var2 } vw m
+          Atomic [Assume (Gt (ctr_n, Num 1)); Asgn (ctr_m, Add (ctr_n, Num (-1))); Asgn (ctr_n, Num 1)], split { nodes = hfrom.nodes; succ = hfrom.succ; var = var2 } vw m
         ]
   | NextAsgnNull u ->
       let n = VarMap.find u hfrom.var in
