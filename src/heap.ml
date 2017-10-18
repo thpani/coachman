@@ -71,7 +71,7 @@ let ctr_of_node n = Printf.sprintf "x_%d" n
 type ploc = int
 type cloc = ploc * structure
 
-let dump_cloc ?(sep=", ") (p, s) = Printf.sprintf "%d:%s%s" p sep (dump_str ~sep s)
+let dump_cloc ?(sep=", ") (p, s) = Printf.sprintf "pc: %d%s%s" p sep (dump_str ~sep s)
 let cloc_equal (a_ploc, a_heap) (b_ploc, b_heap) =
     a_ploc = b_ploc && (structure_equal a_heap b_heap)
 
@@ -198,11 +198,10 @@ let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
       let from_vertex = Queue.pop q in
       let from, from_heap = from_vertex in
       Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
-        Printf.printf "%s%d -> %d (%s) => %s -> " indent from to_ (Ast.pprint ~sep:"; " stmt) (dump_cloc from_vertex) ;
+        Debugger.logf Debugger.Info "%s%d -> %d (%s) => %s -> " indent from to_ (Ast.pprint ~sep:"; " stmt) (dump_cloc from_vertex) ;
         let translated = l2ca from_heap stmt in
         List.iter (fun (tstmt, to_heap) ->
             let to_vertex = to_, to_heap in
-            Printf.printf "%s (%s)" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) ;
             let isomorphic_structures, found_isomorphic = find_isomorphic_heap g tstmt to_vertex in
             let isomorphic_structures_num = List.length isomorphic_structures in
             let tstmt, to_heap = match isomorphic_structures with
@@ -224,11 +223,11 @@ let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
               let has_to_vertex = G.mem_vertex g to_vertex in
               if isomorphic_structures_num > 0 then
                 if found_isomorphic then
-                  Printf.printf " ~ %s (%s) [out of %d isomorphic structures]\n" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) isomorphic_structures_num
+                  Debugger.logf Debugger.Info " ~ %s (%s) [out of %d isomorphic structures]\n" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) isomorphic_structures_num
                 else
-                  Printf.printf " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (Ast.pprint ~sep:"; " tstmt) (dump_cloc to_vertex)
+                  Debugger.logf Debugger.Info " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt)
               else
-                Printf.printf " [0 isomorphic structures found]\n"
+                Debugger.logf Debugger.Info " [0 isomorphic structures found]\n"
               ;
               G.add_edge_e g (from_vertex, (tstmt, (from, (stmt, summary), to_)), to_vertex) ;
               if not has_to_vertex then Queue.add to_vertex q
@@ -402,7 +401,7 @@ and l2ca hfrom stmt =
       [ Assume True, { nodes = hfrom.nodes ; succ ; var = hfrom.var } ]
   | Assume g -> [ Assume g, hfrom ]
   | Atomic stmts  -> 
-      Printf.printf "\n  ATOMIC TRANSITION COMPUTATION:\n" ;
+      Debugger.logf Debugger.Info "\n  ATOMIC TRANSITION COMPUTATION:\n  " ;
       let cfg = Cfg.ast_to_cfg stmts in
       (* don't prune infeasible edges on atomic transition computation;
        * otherwise we end up with an incorrect final vertex.
