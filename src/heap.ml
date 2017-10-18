@@ -129,64 +129,126 @@ let next_free_node nodes =
   in
   x_next_free_node 1
 
-let reduce_seq_commands seq =
-  (* Filter assume(true); *)
-  let filter_assume_true seq = List.filter (fun stmt -> match stmt with Assume True -> false | _ -> true) seq in
-  (* Filter idempotent assignments *)
-  let rec filter_succ_ass seq = match seq with
-    | Asgn (c1, Num n1) :: (Asgn (c2, Num n2) :: rest) when c1 = c2 -> filter_succ_ass (Asgn (c2, Num n2) :: rest)
-    | s1 :: rest -> s1 :: (filter_succ_ass rest)
-    | [] -> []
+let reduce_seq_stmts seq final_vars =
+  let rec x_reduce_seq_stmts seq final_vars =
+    let rec def var seq = match seq with
+    | Asgn (v, expr) :: tl when v = var -> true
+    | hd :: tl -> def var tl
+    | [] -> false
+    in
+    let rec use_expr var e = match e with
+    | Id id -> var = id
+    | Num _ -> false
+    | Add (id, expr) -> var = id || use_expr var expr
+    in
+    let rec use_guard var g = match g with
+    | Eq (id, e) -> id = var || use_expr var e
+    | Gt (id, e) -> id = var || use_expr var e
+    | Neg g      -> use_guard var g
+    | True       -> false
+    | False      -> false
+    | _ -> assert false
+    in
+    let rec use var seq = match seq with
+      | s :: tl -> begin
+        match s with
+        | Asgn (id,e) -> use_expr var e
+        | Assume g    -> use_guard var g
+        | Atomic l    -> use var l
+        | _ -> assert false
+      end || use var tl
+      | [] -> false
+    in
+    (* Filter assume(true); *)
+    let filter_assume_true seq = List.filter (fun stmt -> match stmt with Assume True -> false | _ -> true) seq in
+    let rec def_use seq = 
+      let final_ctrs = List.map ctr_of_node (NodeSet.elements final_vars) in
+      let rec replace_seq seq v replacement = 
+        let rec replace_expr e v replacement = match e with
+        | Id id          -> if id = v then replacement else Id id
+        | Add (id, expr) -> begin
+            if id <> v then
+              Add (id, replace_expr expr v replacement)
+            else match expr with
+              | Id id2 -> Add (id2, Id id)
+              | expr -> assert false
+        end
+        | Num num -> Num num
+        in
+        (* let rec replace_guard g v replacement = match g with *)
+        (* | Eq (id, expr) -> assert (id <> v); Eq (id, (replace_expr expr v replacement)) *)
+        (* | Gt (id, expr) -> assert (id <> v); Gt (id, (replace_expr expr v replacement)) *)
+        (* | EqNull id -> assert (id <> v); EqNull id *)
+        (* | Neg g -> Neg (replace_guard g v replacement) *)
+        (* in *)
+        match seq with
+        | Asgn (id, expr) :: tl -> Asgn (id, replace_expr expr v replacement) :: (replace_seq tl v replacement)
+        (* | Assume g :: tl -> Assume (replace_guard g v replacement) :: (replace_seq tl v replacement) *)
+        | hd :: tl -> raise (Invalid_argument (Printf.sprintf "Replacement on non-assignment: %s" (Ast.pprint hd)))
+        | [] -> []
+      in
+      let rec vars_in_expr e = match e with
+        | Add (id, expr) -> id :: vars_in_expr expr
+        | Id id -> [id]
+        | Num num -> []
+      in
+      match seq with
+      | Asgn (v, expr) :: tl ->
+          let remove_last l = match (List.rev l) with | h::t -> List.rev t | [] -> [] in
+          let vars_in_expr_ = vars_in_expr expr in
+          let vars_in_expr_def_in_tl_but_last = List.fold_left (fun b v -> b || (def v (remove_last tl))) false vars_in_expr_ in
+          if def v tl && not (use v tl) then
+            (* Filter defs if there is a later def without any use *)
+            def_use tl
+          else if not (List.mem v final_ctrs) && not vars_in_expr_def_in_tl_but_last then
+            (* Filter defs if the assigned counter refers to a node no longer present *)
+            def_use (replace_seq tl v expr)
+          else
+            Asgn (v, expr) :: (def_use tl)
+      | hd :: tl -> hd :: (def_use tl)
+      | [] -> []
+    in
+    def_use (def_use (filter_assume_true seq))
   in
-  (* Constant propagation *)
-  let rec propagate_constants seq = match seq with
-    | [ Asgn (c1, expr1) ; Asgn (c2, Id c3) ] when c1 = c3 -> [ Asgn (c2, expr1) ]
-    | s1 :: (s2 :: rest) -> begin
-        match s1, s2 with
-        | Asgn (c1, Num n), Asgn (c2, Add (c3, Id c4)) when c1 = c3 -> Asgn (c2, Add(c4, Num n)) :: (propagate_constants rest)
-        | _ -> propagate_constants (s2 :: rest)
-    end
-    | s1 :: rest -> s1 :: (propagate_constants rest)
-    | [] -> []
-  in
-  let reduced = propagate_constants (filter_succ_ass (filter_assume_true seq)) in
-  let reduced = match List.length reduced with
+  (* Printf.printf "REDUCING %s\n" (Ast.pprint_seq ~sep:"; " seq) ; *)
+  let fixpoint =  x_reduce_seq_stmts seq final_vars in
+  match List.length fixpoint with
     | 0 -> Assume True
-    | 1 -> List.hd reduced
-    | _ -> Atomic reduced
-  in
-  reduced
+    | 1 -> List.hd fixpoint
+    | _ -> Atomic fixpoint
 
 let find_isomorphic_heap g stmt to_vertex =
   let to_ploc, heap = to_vertex in
-  let max_elt = NodeSet.max_elt heap.nodes in
-  let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
-  let enumerated_max = List.fold_left (fun set elt -> NodeSet.add elt set) NodeSet.empty (1--max_elt) in
-  let novel_nodes = NodeSet.diff enumerated_max heap.nodes in
-  let rename_structure h from to_ =
-    let rename_node node = if node = from then to_ else node in
-    let nodes = NodeSet.map rename_node h.nodes in
-    let succ = List.fold_left (fun map (f,t) -> SuccMap.add (rename_node f) (rename_node t) map) SuccMap.empty (SuccMap.bindings h.succ) in
-    let var = List.fold_left (fun map (f,t) -> VarMap.add f (rename_node t) map) VarMap.empty (VarMap.bindings h.var) in
-    { nodes ; succ ; var }
-  in
-  let isomorphic_structures = List.map (fun novel_node ->
-    let rewrites = List.map (fun potentially_discarded_node -> potentially_discarded_node, novel_node) (NodeSet.elements heap.nodes) in
-    let isomporphic_structure_candidates = List.map (fun (f,t) -> f, t, rename_structure heap f t) rewrites in
-    let isomorphic_structures = List.filter (fun (f, t, structure) -> G.mem_vertex g (to_ploc, structure)) isomporphic_structure_candidates in
-    isomorphic_structures
-  ) (NodeSet.elements novel_nodes) in
-  let isomorphic_structures = List.concat isomorphic_structures in
-  if (List.length isomorphic_structures) > 0 then
-    (* isomorphic structures found in the graph *)
-    isomorphic_structures, true
-  else if (NodeSet.cardinal novel_nodes) > 0 then
-    (* no isomorphic structures found; still rename the max node *)
-    let novel_node = NodeSet.min_elt novel_nodes in
-    [ max_elt, novel_node, rename_structure heap max_elt novel_node ], false
-  else
-    (* no isomorphic structures found; no renaming possible (|nodes| = max {nodes}) *)
-    [], false
+  let max_elt = NodeSet.max_elt_opt heap.nodes in
+  match max_elt with Some max_elt ->
+    let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
+    let enumerated_max = List.fold_left (fun set elt -> NodeSet.add elt set) NodeSet.empty (1--max_elt) in
+    let novel_nodes = NodeSet.diff enumerated_max heap.nodes in
+    let rename_structure h from to_ =
+      let rename_node node = if node = from then to_ else node in
+      let nodes = NodeSet.map rename_node h.nodes in
+      let succ = List.fold_left (fun map (f,t) -> SuccMap.add (rename_node f) (rename_node t) map) SuccMap.empty (SuccMap.bindings h.succ) in
+      let var = List.fold_left (fun map (f,t) -> VarMap.add f (rename_node t) map) VarMap.empty (VarMap.bindings h.var) in
+      { nodes ; succ ; var }
+    in
+    let isomorphic_structures = List.map (fun novel_node ->
+      let rewrites = List.map (fun potentially_discarded_node -> potentially_discarded_node, novel_node) (NodeSet.elements heap.nodes) in
+      let isomporphic_structure_candidates = List.map (fun (f,t) -> f, t, rename_structure heap f t) rewrites in
+      let isomorphic_structures = List.filter (fun (f, t, structure) -> G.mem_vertex g (to_ploc, structure)) isomporphic_structure_candidates in
+      isomorphic_structures
+    ) (NodeSet.elements novel_nodes) in
+    let isomorphic_structures = List.concat isomorphic_structures in
+    if (List.length isomorphic_structures) > 0 then
+      (* isomorphic structures found in the graph *)
+      isomorphic_structures, true
+    else if (NodeSet.cardinal novel_nodes) > 0 then
+      (* no isomorphic structures found; still rename the max node *)
+      let novel_node = NodeSet.min_elt novel_nodes in
+      [ max_elt, novel_node, rename_structure heap max_elt novel_node ], false
+    else
+      (* no isomorphic structures found; no renaming possible (|nodes| = max {nodes}) *)
+      [], false
+    | None -> [], false
 
 let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
   let g = G.create () in
@@ -204,21 +266,34 @@ let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
             let to_vertex = to_, to_heap in
             let isomorphic_structures, found_isomorphic = find_isomorphic_heap g tstmt to_vertex in
             let isomorphic_structures_num = List.length isomorphic_structures in
-            let tstmt, to_heap = match isomorphic_structures with
-              | isomorphic_structure :: tl ->
-                  let f, t, structure = isomorphic_structure in
-                  let rewritten_stmt = reduce_seq_commands [ tstmt ; Asgn (ctr_of_node t, Id (ctr_of_node f)) ] in
-                  rewritten_stmt, structure
-              | _ -> tstmt, to_heap
+            let tstmt, to_heap =
+              try
+                match isomorphic_structures with
+                | isomorphic_structure :: tl ->
+                    let f, t, structure = isomorphic_structure in
+                    let rewritten_stmt = reduce_seq_stmts [ tstmt ; Asgn (ctr_of_node t, Id (ctr_of_node f)) ] structure.nodes in
+                    rewritten_stmt, structure
+                | _ -> tstmt, to_heap
+              with
+                | Invalid_argument msg -> tstmt, to_heap
             in
-            let to_vertex = to_, to_heap in
             (* prune infeasible assume edges *)
             let tstmt = match tstmt with
-            | Assume Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) <> (VarMap.find id2 from_heap.var) -> Assume False
-            | Assume Neg Eq (id1, Id id2) when (VarMap.find id1 from_heap.var) = (VarMap.find id2 from_heap.var) -> Assume False
+            | Assume Eq (id1, Id id2)     -> Assume (ttolit ((VarMap.find id1 from_heap.var) = (VarMap.find id2 from_heap.var)))
+            | Assume Neg Eq (id1, Id id2) -> Assume (ttolit ((VarMap.find id1 from_heap.var) <> (VarMap.find id2 from_heap.var)))
+            | Assume EqNull id            -> Assume (ttolit ((VarMap.find id from_heap.var) = 0))
+            | Assume Neg EqNull id        -> Assume (ttolit ((VarMap.find id from_heap.var) <> 0))
             | _ -> tstmt
             in
-            if prune_infeasible && tstmt = (Assume False) then ()
+            Debugger.logf Debugger.Info "%s (%s)" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) ;
+            let to_vertex = to_, to_heap in
+            if tstmt = Assume False then
+              begin
+                Debugger.logf Debugger.Info "\n" ;
+                match prune_infeasible with
+                | true -> ()
+                | false -> G.add_edge_e g (from_vertex, (tstmt, (from, (stmt, summary), to_)), to_vertex) ;
+              end
             else begin
               let has_to_vertex = G.mem_vertex g to_vertex in
               if isomorphic_structures_num > 0 then
@@ -410,15 +485,22 @@ and l2ca hfrom stmt =
       let final_vertices = G.fold_vertex (fun v l -> match G.succ cfg' v with [] -> v :: l | _ -> l) cfg' [] in
       (* List.iter (fun (vertex,_) -> Printf.printf "FINAL VERTEX: %d\n" vertex) final_vertices ; *)
       let final_heaps = List.map (fun (ploc,heap) -> 
-        let var = VarMap.filter (fun v n -> v <> "node") heap.var in
+        let var = VarMap.filter (fun v n -> not (Str.string_match (Str.regexp "^__") v 0)) heap.var in
         { nodes = heap.nodes ; succ = heap.succ ; var }
       ) final_vertices in
       let paths = List.map (fun final -> Dijkstra.shortest_path cfg' (0, hfrom) final) final_vertices in
       let path_stmts_seq = List.map (fun (path,_) -> List.map (fun (from, (stmt,_), to_) -> stmt) path) paths in
+      let rec unwrap_atomic seq = match seq with
+        | Atomic s :: rest -> (unwrap_atomic s) @ (unwrap_atomic rest)
+        | s1 :: rest -> s1 :: (unwrap_atomic rest)
+        | [] -> []
+      in
+      let path_stmts_seq = List.map unwrap_atomic path_stmts_seq in
       (* List.iter (fun path -> Printf.printf "LEN PATH: %d\n" (List.length path)) path_stmts_seq ; *)
-      let path_stmts_seq_filtered = List.map reduce_seq_commands path_stmts_seq in
-      print_string "  " ; 
-      List.map2 (fun stmt heap -> stmt, heap) path_stmts_seq_filtered final_heaps
+      (* List.iter (fun path -> print_endline (Ast.pprint_seq ~sep:"; " path)) path_stmts_seq ; *)
+      List.map2 (fun stmt heap -> 
+        (try reduce_seq_stmts stmt heap.nodes with Invalid_argument msg -> Atomic stmt),
+        heap) path_stmts_seq final_heaps
   | _ -> assert false
 
 let remove_summary_edges g =

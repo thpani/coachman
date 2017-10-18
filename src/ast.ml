@@ -48,6 +48,8 @@ let rec pprint_guard = function
   | False -> "false"
   | CAS (id1, id2, id3) -> Printf.sprintf "CAS(%s, %s, %s)" id1 id2 id3
 
+let ttolit = function true -> True | false -> False
+
 let rec pprint_seq ?(sep=";\n") ?(atomic_angles=true) stmts = String.concat sep (List.map (pprint ~sep ~atomic_angles) stmts)
 and pprint ?(sep=";\n") ?(atomic_angles=true) stmt = match stmt with
   | IfThenElse (g, sif, selse) -> String.concat "\n" [ "IF " ^ (pprint_guard g) ; pprint_seq sif ; "ELSE" ; pprint_seq selse ; "FI" ]
