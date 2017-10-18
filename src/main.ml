@@ -21,9 +21,12 @@ let () =
     let parsed = parse fn_heap Parser_heap.heap Lexer_heap.token in
     Heap.structure_from_heap parsed
   in
-  let parse_program path =
+  let parse_program ?(precompile=true) path =
     let ast_list = parse path Parser.program Lexer.token in
-    List.map (fun (id, ast) -> id, Ast.precompile_seq ast) ast_list
+    if precompile then
+      List.map (fun (id, ast) -> id, Ast.precompile_seq ast) ast_list
+    else
+      ast_list
   in
   let get_sccs g =
     let components = (Heap.SCC.scc_list g) in
@@ -35,18 +38,20 @@ let () =
   in
   let gen_cfg ast = Cfg.ast_to_cfg ~reduce:true ast in
   let init_heap = parse_heap in
+  let ast_orig = parse_program ~precompile:false fn_prog in
   let ast_list = parse_program fn_prog in
   let ast_summ = parse_program fn_summary in
-  List.iter (fun (fun_name, ast) ->
+  List.iter2 (fun (_, ast_orig) (fun_name, ast) ->
     let cfg = gen_cfg ast in
+    let cfg_orig = gen_cfg ast_orig in
+    let cfg_dot = (Filename.basename Sys.argv.(1)) ^ "." ^ fun_name ^ ".dot" in
     Cfg.add_summaries cfg ast_summ ;
     Printf.printf "%s() :: " fun_name ;
-    let cfg_dot = (Filename.basename Sys.argv.(1)) ^ "." ^ fun_name ^ ".dot" in
     let bicfg = Heap.convert init_heap cfg in
     let bicfg_dot = (Filename.basename Sys.argv.(1)) ^ "." ^ fun_name ^ ".bi.dot" in
-    Cfg.Dot.write_dot cfg cfg_dot ;
+    Cfg.Dot.write_dot cfg_orig cfg_dot ;
     Heap.Dot.write_dot bicfg bicfg_dot ;
     print_stats bicfg ;
     Heap.remove_summary_edges bicfg ;
     Printf.printf ", SCCs (ranked): %d\n" (get_sccs bicfg)
-  ) ast_list
+  ) ast_orig ast_list
