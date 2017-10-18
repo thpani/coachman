@@ -1,0 +1,6 @@
+def pop begin
+<
+  assume(!(ToS = null));
+  ToS := ToS.next;
+> ;
+end

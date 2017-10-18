@@ -5,9 +5,13 @@
   exception Error of string
 }
 
-let blank = [' ' '\r' '\t' '\n']
+let white = [' ' '\t']+
+let newline = '\r' | '\n' | "\r\n"
 
 rule token = parse
+  | "def" { DEF }
+  | "begin" { BEGIN }
+  | "end" { END }
   | "if" { IF }
   | "then" { THEN }
   | "else" { ELSE }
@@ -33,7 +37,8 @@ rule token = parse
   | '>' { RANGLE }
   | '(' { LPAREN }
   | ')' { RPAREN }
-  | blank { token lexbuf }
+  | white { token lexbuf }
+  | newline { new_line lexbuf ; token lexbuf }
   | ['_' 'a'-'z' 'A'-'Z']['_' 'A'-'Z' 'a'-'z' '0'-'9' '\'']* as i { ID(i) }
   | _ { raise (Error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof  { EOF }

@@ -30,13 +30,20 @@
 %token LPAREN
 %token RPAREN
 %token ASSUME
+%token DEF
+%token BEGIN
+%token END
 
 %start program
 %type <Ast.program> program
 %%
 
 program:
-  | seq_stmt EOF { $1 }
+  | EOF { [] }
+  | fct program { $1 :: $2 }
+
+fct:
+  | DEF ID BEGIN seq_stmt END { ($2, $4) }
   ;
   
 seq_stmt:
@@ -49,7 +56,7 @@ statement:
   | IF guard THEN seq_stmt FI                 { IfThenElse ($2, $4, []) }
   | WHILE guard DO seq_stmt OD                { While ($2, $4) }
   | asgn SEMI                                 { $1 }
-  | LANGLE seq_stmt RANGLE                    { Atomic ($2) }
+  | LANGLE seq_stmt RANGLE SEMI               { Atomic ($2) }
   | ASSUME LPAREN guard RPAREN SEMI           { Assume ($3) }
   | BREAK SEMI                                { Break }
   ;
@@ -66,7 +73,7 @@ asgn:
 guard:
   | ID EQ ID    { Eq($1, Id $3) }
   | ID EQ NULL  { EqNull($1) }
-  | NEG guard   { Neg($2) }
+  | NEG LPAREN guard RPAREN   { Neg($3) }
   | TRUE  { True }
   | FALSE { False }
   | CAS LPAREN ID COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7) }

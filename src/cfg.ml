@@ -142,5 +142,7 @@ let ast_to_cfg ?(reduce=true) ast =
   x_ast_to_cfg ast ;
   if reduce then reduce_cfg g else g
 
-let add_summaries cfg summary =
-  G.iter_vertex (fun v -> G.add_edge_e cfg (v, (summary, 1), v)) cfg ; cfg
+let add_summaries cfg summaries =
+  List.iteri (fun i (summary_name, summary) ->
+    G.iter_vertex (fun v -> G.add_edge_e cfg (v, (Atomic summary, i+1), v)) cfg
+  ) summaries

@@ -1,8 +1,23 @@
-newHead := new;
-while true do
-  oldHead := ToS;
-  newHead.next := oldHead;
-  if CAS(ToS, oldHead, newHead) then
-    break;
-  fi
-od
+def push begin
+  node := new;
+  while true do
+    top := ToS;
+    node.next := top;
+    if CAS(ToS, top, node) then
+      break;
+    fi
+  od
+end
+
+def pop begin
+  while true do
+    top := ToS;
+    if top = null then
+      break;
+    fi
+    node := top.next;
+    if CAS(ToS, top, node) then
+      break;
+    fi
+  od
+end

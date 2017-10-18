@@ -3,12 +3,5 @@ def push begin
   __node := new;
   __node.next := ToS;
   ToS := __node;
->;
-end
-
-def pop begin
-<
-  assume(!(ToS = null));
-  ToS := ToS.next;
->;
+> ;
 end

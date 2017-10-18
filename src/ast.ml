@@ -27,7 +27,7 @@ type stmt =
   | Atomic of stmt list
   | Break
 
-type program = stmt list
+type program = (identifier * stmt list) list
 
 let rec pprint_expr = function
   | Id id -> id

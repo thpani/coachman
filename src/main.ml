@@ -22,25 +22,31 @@ let () =
     Heap.structure_from_heap parsed
   in
   let parse_program path =
-    let ast = parse fn_prog Parser.program Lexer.token in
-    Ast.precompile_seq ast
+    let ast_list = parse path Parser.program Lexer.token in
+    List.map (fun (id, ast) -> id, Ast.precompile_seq ast) ast_list
   in
-  let print_stats g =
+  let get_sccs g =
     let components = (Heap.SCC.scc_list g) in
     let non_trivial_sccs = List.filter (fun vertices -> (List.length vertices) > 1) components in
-    Printf.printf "vertices: %d, edges: %d, SCCs: %d\n" (Heap.G.nb_vertex g) (Heap.G.nb_edges g) (List.length non_trivial_sccs)
+    List.length non_trivial_sccs
+  in
+  let print_stats g =
+    Printf.printf "vertices: %d, edges: %d, SCCs: %d" (Heap.G.nb_vertex g) (Heap.G.nb_edges g) (get_sccs g)
   in
   let gen_cfg ast = Cfg.ast_to_cfg ~reduce:true ast in
   let init_heap = parse_heap in
-  let ast = parse_program fn_prog in
+  let ast_list = parse_program fn_prog in
   let ast_summ = parse_program fn_summary in
-  let cfg = gen_cfg ast in
-  let cfg = Cfg.add_summaries cfg (List.hd ast_summ) in
-  let cfg_dot = (Filename.basename Sys.argv.(1)) ^ ".dot" in
-  let bicfg = Heap.convert init_heap cfg in
-  let bicfg_dot = (Filename.basename Sys.argv.(1)) ^ ".bi.dot" in
-  Cfg.Dot.write_dot cfg cfg_dot ;
-  Heap.Dot.write_dot bicfg bicfg_dot ;
-  Printf.printf "Stats :: " ; print_stats bicfg ;
-  Heap.remove_summary_edges bicfg ;
-  Printf.printf "Stats (ranked) :: " ; print_stats bicfg ;
+  List.iter (fun (fun_name, ast) ->
+    let cfg = gen_cfg ast in
+    Cfg.add_summaries cfg ast_summ ;
+    Printf.printf "%s() :: " fun_name ;
+    let cfg_dot = (Filename.basename Sys.argv.(1)) ^ "." ^ fun_name ^ ".dot" in
+    let bicfg = Heap.convert init_heap cfg in
+    let bicfg_dot = (Filename.basename Sys.argv.(1)) ^ "." ^ fun_name ^ ".bi.dot" in
+    Cfg.Dot.write_dot cfg cfg_dot ;
+    Heap.Dot.write_dot bicfg bicfg_dot ;
+    print_stats bicfg ;
+    Heap.remove_summary_edges bicfg ;
+    Printf.printf ", SCCs (ranked): %d\n" (get_sccs bicfg)
+  ) ast_list
