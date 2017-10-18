@@ -260,7 +260,7 @@ let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
       let from_vertex = Queue.pop q in
       let from, from_heap = from_vertex in
       Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
-        Debugger.logf Debugger.Info "%s%d -> %d (%s) => %s -> " indent from to_ (Ast.pprint ~sep:"; " stmt) (dump_cloc from_vertex) ;
+        Debugger.logf Debugger.Info "%s%d -> %d (%s) => %s ->\n" indent from to_ (Ast.pprint ~sep:"; " stmt) (dump_cloc from_vertex) ;
         let translated = l2ca from_heap stmt in
         List.iter (fun (tstmt, to_heap) ->
             let to_vertex = to_, to_heap in
@@ -285,7 +285,7 @@ let rec convert ?(indent=0) ?(prune_infeasible=true) init_heap cfg =
             | Assume Neg EqNull id        -> Assume (ttolit ((VarMap.find id from_heap.var) <> 0))
             | _ -> tstmt
             in
-            Debugger.logf Debugger.Info "%s (%s)" (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) ;
+            Debugger.logf Debugger.Info "%s%s%s (%s)" indent indent (dump_cloc to_vertex) (Ast.pprint ~sep:"; " tstmt) ;
             let to_vertex = to_, to_heap in
             if tstmt = Assume False then
               begin
@@ -476,11 +476,11 @@ and l2ca hfrom stmt =
       [ Assume True, { nodes = hfrom.nodes ; succ ; var = hfrom.var } ]
   | Assume g -> [ Assume g, hfrom ]
   | Atomic stmts  -> 
-      Debugger.logf Debugger.Info "\n  ATOMIC TRANSITION COMPUTATION:\n  " ;
+      Debugger.logf Debugger.Info "  ATOMIC TRANSITION COMPUTATION:\n" ;
       let cfg = Cfg.ast_to_cfg stmts in
       (* don't prune infeasible edges on atomic transition computation;
        * otherwise we end up with an incorrect final vertex.
-       * the infeasible stmt will later be reduced. *)
+       * the infeasible assume(false) edge will later be removed. *)
       let cfg' = convert ~indent:2 ~prune_infeasible:false hfrom cfg in
       let final_vertices = G.fold_vertex (fun v l -> match G.succ cfg' v with [] -> v :: l | _ -> l) cfg' [] in
       (* List.iter (fun (vertex,_) -> Printf.printf "FINAL VERTEX: %d\n" vertex) final_vertices ; *)
