@@ -15,7 +15,7 @@ let () =
       close_in input ; parsed
     with
     | Lexer.Error msg -> Printf.eprintf "[Lexer error] %s @  %s: %s\n" path (position_string lexbuf) msg ; exit (1)
-    | Parsing.Parse_error -> Printf.eprintf "[Parser error] %s @ %s\n" path (position_string lexbuf) ; exit (1)
+    | Parser.Error -> Printf.eprintf "[Parser error] %s @ %s\n" path (position_string lexbuf) ; exit (1)
   in
   let parse_heap =
     let parsed = parse fn_heap Parser_heap.heap Lexer_heap.token in

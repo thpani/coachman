@@ -8,7 +8,7 @@
 
 .PHONY: all clean byte native profile debug sanity test test1 test2 test3 testt testt_emp unit
 
-OCB_FLAGS = -use-ocamlfind -I src -I src/programs -I src/heaps -I lib
+OCB_FLAGS = -use-ocamlfind -use-menhir -I src -I src/programs -I src/heaps -I lib
 OCB = ocamlbuild $(OCB_FLAGS)
 
 all: native byte # profile debug
