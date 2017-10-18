@@ -13,6 +13,7 @@ type guard =
   | True
   | False
   | CAS of identifier * identifier * identifier
+  | CASnext of identifier * identifier * identifier
 
 type stmt =
   | IfThenElse of guard * stmt list * stmt list
@@ -26,6 +27,7 @@ type stmt =
   | Assume of guard
   | Atomic of stmt list
   | Break
+  | CAS of identifier * identifier * identifier
 
 type program = (identifier * stmt list) list
 
@@ -47,6 +49,7 @@ let rec pprint_guard = function
   | True -> "true"
   | False -> "false"
   | CAS (id1, id2, id3) -> Printf.sprintf "CAS(%s, %s, %s)" id1 id2 id3
+  | CASnext (id1, id2, id3) -> Printf.sprintf "CAS(%s.next, %s, %s)" id1 id2 id3
 
 let ttolit = function true -> True | false -> False
 
@@ -63,6 +66,7 @@ and pprint ?(sep=";\n") ?(atomic_angles=true) stmt = match stmt with
   | Assume g -> Printf.sprintf "assume(%s)" (pprint_guard g)
   | Atomic s -> if atomic_angles then "<" ^ (pprint_seq ~sep ~atomic_angles s) ^ ">" else pprint_seq ~sep ~atomic_angles s
   | Break -> "break"
+  | CAS (id1, id2, id3) -> Printf.sprintf "CAS(%s, %s, %s)" id1 id2 id3
 
 (* Each pointer assignment of the form u := new, u := w, or u := w.next is
  * immediately preceded by an assignment of the form u := null. A pointer
@@ -77,6 +81,7 @@ and precompile ?(intr_atomic=true) = function
   | Atomic s                   -> [ Atomic (precompile_seq ~intr_atomic:false s) ]
   | Break                      -> [ Break ]
   | Assume g                   -> [ Assume g ]
+  | CAS (id1, id2, id3) -> [ IfThenElse (CAS(id1, id2, id3), [], []) ]
   | s -> let t = match s with
     | Alloc id                            -> [ AsgnNull id ; Alloc id ]
     | Asgn (id1, Id id2)  when id1 <> id2 -> [ AsgnNull id1; Asgn (id1, Id id2) ]

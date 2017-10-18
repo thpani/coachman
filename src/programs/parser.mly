@@ -59,6 +59,7 @@ statement:
   | LANGLE seq_stmt RANGLE SEMI               { Atomic ($2) }
   | ASSUME LPAREN guard RPAREN SEMI           { Assume ($3) }
   | BREAK SEMI                                { Break }
+  | CAS LPAREN ID COMMA ID COMMA ID RPAREN SEMI { CAS ($3, $5, $7) }
   ;
 
 asgn:
@@ -77,4 +78,5 @@ guard:
   | TRUE  { True }
   | FALSE { False }
   | CAS LPAREN ID COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7) }
+  | CAS LPAREN ID DOT NEXT COMMA ID COMMA ID RPAREN    { CASnext ($3, $7, $9) }
   ;
