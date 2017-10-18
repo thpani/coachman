@@ -53,19 +53,25 @@ test3: native
 	dot -Tpdf test3.tiny.bi.dot >test3.tiny.bi.dot.pdf
 	open test3.tiny.bi.dot.pdf
 
-testt: native
-	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber.summaries
-	dot -Tpdf treiber.tiny.dot >treiber.tiny.dot.pdf
-	open treiber.tiny.dot.pdf
-	dot -Tpdf treiber.tiny.bi.dot >treiber.tiny.bi.dot.pdf
-	open treiber.tiny.bi.dot.pdf
-
 testt_emp: native
 	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/empty.summaries
-	dot -Tpdf treiber.tiny.dot >treiber.tiny.dot.pdf
-	open treiber.tiny.dot.pdf
-	dot -Tpdf treiber.tiny.bi.dot >treiber.tiny.bi.dot.pdf
-	open treiber.tiny.bi.dot.pdf
+
+testt_pop: native
+	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber_pop.summaries
+
+testt_push: native
+	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber_push.summaries
+
+testt_push_pop: native
+	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber.summaries
+
+testt: testt_emp testt_pop testt_push testt_push_pop
+
+dot_testt:
+	dot -Tpdf treiber.tiny.push.dot >treiber.tiny.push.dot.pdf && open treiber.tiny.push.dot.pdf
+	dot -Tpdf treiber.tiny.push.bi.dot >treiber.tiny.push.bi.dot.pdf && open treiber.tiny.push.bi.dot.pdf
+	dot -Tpdf treiber.tiny.pop.dot >treiber.tiny.pop.dot.pdf && open treiber.tiny.pop.dot.pdf
+	dot -Tpdf treiber.tiny.pop.bi.dot >treiber.tiny.pop.bi.dot.pdf && open treiber.tiny.pop.bi.dot.pdf
 
 unit:
 	$(OCB) -package oUnit -I test/unit heaptest.native
