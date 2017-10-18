@@ -29,6 +29,8 @@ type stmt =
 
 type program = (identifier * stmt list) list
 
+let dummy_var = "__l2ca_dummy"
+
 let rec pprint_expr = function
   | Id id -> id
   | Num num -> string_of_int num
@@ -60,13 +62,24 @@ and pprint ?(sep=";\n") ?(atomic_angles=true) stmt = match stmt with
   | Atomic s -> if atomic_angles then "<" ^ (pprint_seq ~sep ~atomic_angles s) ^ ">" else pprint_seq ~sep ~atomic_angles s
   | Break -> "break"
 
+(* Each pointer assignment of the form u := new, u := w, or u := w.next is
+ * immediately preceded by an assignment of the form u := null. A pointer
+ * assignment of the form u := u.next is turned into v := u; u := null; u :=
+ * v.next, possibly introducing a fresh variable v. Each pointer assignment of
+ * the form u.next := w is immediately preceded by u.next := null.
+ *)
 let rec precompile_seq ?(intr_atomic=true) stmts = List.concat (List.map (precompile ~intr_atomic) stmts)
 and precompile ?(intr_atomic=true) = function
   | IfThenElse (g, sif, selse) -> [ IfThenElse (g, precompile_seq sif, precompile_seq selse) ]
-  | While (g, s)     -> [ While (g, precompile_seq s) ]
-  | Alloc id         -> let x = [ AsgnNull id ; Alloc id ] in if intr_atomic then [ Atomic x ] else x
-  | Asgn (id1, id2)  -> let x = [ AsgnNull id1; Asgn (id1, id2) ] in if intr_atomic then [ Atomic x ] else x
-  | AsgnNext (id1, id2) -> let x = [ AsgnNull id1; AsgnNext (id1, id2) ] in if intr_atomic then [ Atomic x ] else x
-  | NextAsgnId (id1, id2) -> let x = [ NextAsgnNull id1 ; NextAsgnId (id1, id2) ] in if intr_atomic then [ Atomic x ] else x
-  | Atomic s -> [ Atomic (precompile_seq ~intr_atomic:false s) ]
-  | x -> [ x ]
+  | While (g, s)               -> [ While (g, precompile_seq s) ]
+  | Atomic s                   -> [ Atomic (precompile_seq ~intr_atomic:false s) ]
+  | Break                      -> [ Break ]
+  | Assume g                   -> [ Assume g ]
+  | s -> let t = match s with
+    | Alloc id                            -> [ AsgnNull id ; Alloc id ]
+    | Asgn (id1, Id id2)  when id1 <> id2 -> [ AsgnNull id1; Asgn (id1, Id id2) ]
+    | AsgnNext (id1, id2) when id1 <> id2 -> [ AsgnNull id1; AsgnNext (id1, id2) ]
+    | AsgnNext (id1, id2) when id1 =  id2 -> [ AsgnNull dummy_var; Asgn (dummy_var, Id id1); AsgnNull id1; AsgnNext (id1, dummy_var); AsgnNull dummy_var ]
+    | NextAsgnId (id1, id2) when id1 <> id2 -> [ NextAsgnNull id1 ; NextAsgnId (id1, id2) ]
+    | _ -> assert false
+  in if intr_atomic then [ Atomic t ] else t
