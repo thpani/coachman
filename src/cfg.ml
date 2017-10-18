@@ -27,7 +27,11 @@ module Dot_ = Graphviz.Dot (struct
   let default_vertex_attributes _ = []
   let vertex_attributes _ = []
   let default_edge_attributes _ = []
-  let edge_attributes (v1, (stmt, summary), v2) = [`Label (Ast.pprint ~atomic_angles:false stmt) ; `Color (if summary > 0 then 0xff0000 else 0)]
+  let edge_attributes (v1, (stmt, summary), v2) = [
+    `Label (Ast.pprint ~atomic_angles:false stmt) ;
+    `Color (Colormap.get_color summary) ;
+    `Fontcolor (Colormap.get_color summary)
+  ]
   let get_subgraph _ = None
 end)
 

@@ -101,8 +101,8 @@ module Dot_ = Graphviz.Dot (struct
   let default_edge_attributes _ = []
   let edge_attributes (v1, (stmt, (_, (_, summary), _)), v2) = [
     `Label (Ast.pprint ~atomic_angles:false stmt) ;
-    `Color (if summary > 0 then 0xff0000 else 0) ;
-    `Fontcolor (if summary > 0 then 0xff0000 else 0)
+    `Color (Colormap.get_color summary) ;
+    `Fontcolor (Colormap.get_color summary)
   ]
   let get_subgraph _ = None
 end)
