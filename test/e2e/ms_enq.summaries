@@ -1,0 +1,10 @@
+def enq begin
+  assume(Tail.next = null);
+  node := new;
+  Tail.next := node;
+end
+
+def enq_swing begin
+  assume(!(Tail.next = null));
+  Tail := Tail.next;
+end
