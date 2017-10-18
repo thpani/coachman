@@ -1,0 +1,15 @@
+def enq begin
+  node := new;
+  while true do
+    tail := Tail;
+    nxt := tail.next;
+    if nxt = null then
+      if CAS(tail.next, nxt, node) then
+        CAS(Tail, tail, nxt);
+        break;
+      fi
+    else
+      CAS(Tail, tail, nxt);
+    fi
+  od
+end

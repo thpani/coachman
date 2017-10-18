@@ -6,7 +6,7 @@
 # - -use-ocamlfind is required to find packages (from Opam)
 # - _tags file introduces packages, bin_annot flag for tool chain
 
-.PHONY: all clean byte native profile debug sanity test test1 test2 test3 testt testt_emp unit
+.PHONY: all clean byte native profile debug sanity unit testt testt_emp testt_push testt_pop dot_testt testms testms_emp testms_push testms_pop dot_testms
 
 OCB_FLAGS = -use-ocamlfind -use-menhir -I src -I src/programs -I src/heaps -I lib
 OCB = ocamlbuild $(OCB_FLAGS)
@@ -32,26 +32,9 @@ debug: sanity
 sanity:
 	ocamlfind query ocamlgraph
 
-test: native
-	./main.native test.tiny empty.heap
-	dot -Tpdf test.tiny.dot >test.tiny.dot.pdf
-	open test.tiny.dot.pdf
-	dot -Tpdf test.tiny.bi.dot >test.tiny.bi.dot.pdf
-	open test.tiny.bi.dot.pdf
-
-test2: native
-	./main.native test2.tiny empty.heap
-	dot -Tpdf test2.tiny.dot >test2.tiny.dot.pdf
-	open test2.tiny.dot.pdf
-	dot -Tpdf test2.tiny.bi.dot >test2.tiny.bi.dot.pdf
-	open test2.tiny.bi.dot.pdf
-
-test3: native
-	./main.native test3.tiny empty.heap
-	dot -Tpdf test3.tiny.dot >test3.tiny.dot.pdf
-	open test3.tiny.dot.pdf
-	dot -Tpdf test3.tiny.bi.dot >test3.tiny.bi.dot.pdf
-	open test3.tiny.bi.dot.pdf
+unit:
+	$(OCB) -package oUnit -I test/unit heaptest.native
+	./heaptest.native
 
 testt_emp: native
 	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/empty.summaries
@@ -73,6 +56,22 @@ dot_testt:
 	dot -Tpdf treiber.tiny.pop.dot >treiber.tiny.pop.dot.pdf && open treiber.tiny.pop.dot.pdf
 	dot -Tpdf treiber.tiny.pop.bi.dot >treiber.tiny.pop.bi.dot.pdf && open treiber.tiny.pop.bi.dot.pdf
 
-unit:
-	$(OCB) -package oUnit -I test/unit heaptest.native
-	./heaptest.native
+testms_emp: native
+	./main.native test/e2e/ms.tiny test/e2e/ms.heap test/e2e/empty.summaries
+
+testms_enq: native
+	./main.native test/e2e/ms.tiny test/e2e/ms.heap test/e2e/ms_enq.summaries
+
+testms_deq: native
+	./main.native test/e2e/ms.tiny test/e2e/ms.heap test/e2e/ms_deq.summaries
+
+testms_enq_deq: native
+	./main.native test/e2e/ms.tiny test/e2e/ms.heap test/e2e/ms.summaries
+
+testms: testms_emp testms_enq testms_deq testms_enq_deq
+
+dot_testms:
+	dot -Tpdf ms.tiny.enq.dot >ms.tiny.enq.dot.pdf && open ms.tiny.enq.dot.pdf
+	dot -Tpdf ms.tiny.enq.bi.dot >ms.tiny.enq.bi.dot.pdf && open ms.tiny.enq.bi.dot.pdf
+	dot -Tpdf ms.tiny.deq.dot >ms.tiny.deq.dot.pdf && open ms.tiny.deq.dot.pdf
+	dot -Tpdf ms.tiny.deq.bi.dot >ms.tiny.deq.bi.dot.pdf && open ms.tiny.deq.bi.dot.pdf
