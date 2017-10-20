@@ -9,7 +9,13 @@ let string_of_lvl = function
   | Warn -> "warn"
   | Info -> "info"
 
-let current_level = ref (ord Info)
+let lvl_of_string = function
+  | "error" -> Error
+  | "warn" -> Warn
+  | "info" -> Info
+  | _ -> raise (Invalid_argument "Invalid log level")
+
+let current_level = ref Warn
 
 let logf lvl =
-  if ord lvl >= !current_level then printf else ifprintf stdout
+  if ord lvl >= ord !current_level then printf else ifprintf stdout

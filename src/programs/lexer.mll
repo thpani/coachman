@@ -22,14 +22,13 @@ rule token = parse
   | ":=" { ASGN }
   | "null" { NULL }
   | "new" { NEW }
-  | "next" { NEXT }
+  | ".next" { NEXT }
   | "break" { BREAK }
   | "CAS" { CAS }
   | "true" { TRUE }
   | "false" { FALSE }
   | "assume" { ASSUME }
   | '=' { EQ }
-  | '.' { DOT }
   | ';' { SEMI }
   | ',' { COMMA }
   | '!' { NEG }

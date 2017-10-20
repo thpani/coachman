@@ -19,7 +19,6 @@
 %token NEW
 %token NEXT
 %token EQ
-%token DOT
 %token SEMI
 %token NEG
 %token EOF
@@ -52,32 +51,32 @@ seq_stmt:
   ;
 
 statement:
-  | IF guard THEN seq_stmt ELSE seq_stmt FI   { IfThenElse ($2, $4, $6) }
-  | IF guard THEN seq_stmt FI                 { IfThenElse ($2, $4, []) }
-  | WHILE guard DO seq_stmt OD                { While ($2, $4) }
-  | asgn SEMI                                 { $1 }
   | LANGLE seq_stmt RANGLE SEMI               { Atomic ($2) }
-  | ASSUME LPAREN guard RPAREN SEMI           { Assume ($3) }
+  | ASSUME LPAREN bexpr RPAREN SEMI           { Assume ($3) }
   | BREAK SEMI                                { Break }
-  | CAS LPAREN ID COMMA ID COMMA ID RPAREN SEMI { CAS ($3, $5, $7) }
+  | IF bexpr THEN seq_stmt ELSE seq_stmt FI   { IfThenElse ($2, $4, $6) }
+  | IF bexpr THEN seq_stmt FI                 { IfThenElse ($2, $4, []) }
+  | WHILE bexpr DO seq_stmt OD                { While ($2, $4) }
+  | ID ASGN NEW SEMI                          { Alloc (Id $1) }
+  | ID ASGN pexpr_null SEMI                   { Asgn (Id $1, $3) }
+  | ID NEXT ASGN pexpr_null SEMI                { Asgn (Next $1, $4) }
+  | CAS LPAREN pexpr COMMA ID COMMA ID RPAREN SEMI { IfThenElse(CAS($3, $5, $7), [], []) }
   ;
 
-asgn:
-  | ID ASGN NULL { AsgnNull ($1) }
-  | ID ASGN NEW  { Alloc ($1) }
-  | ID ASGN ID   { Asgn ($1, Id $3) }
-  | ID ASGN ID DOT NEXT   { AsgnNext ($1, $3) }
-  | ID DOT NEXT ASGN NULL { NextAsgnNull ($1) }
-  | ID DOT NEXT ASGN ID   { NextAsgnId ($1, $5) }
+pexpr:
+  | ID NEXT { Next $1 }
+  | ID      { Id $1 }
   ;
 
-guard:
-  | ID EQ ID    { Eq($1, Id $3) }
-  | ID EQ NULL  { EqNull($1) }
-  | ID DOT NEXT EQ NULL  { NextEqNull($1) }
-  | NEG LPAREN guard RPAREN   { Neg($3) }
+pexpr_null:
+  | pexpr   { $1 }
+  | NULL    { Null }
+  ;
+
+bexpr:
   | TRUE  { True }
   | FALSE { False }
-  | CAS LPAREN ID COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7) }
-  | CAS LPAREN ID DOT NEXT COMMA ID COMMA ID RPAREN    { CASnext ($3, $7, $9) }
+  | pexpr EQ pexpr_null    { Eq($1, $3) }
+  | NEG LPAREN bexpr RPAREN   { Neg($3) }
+  | CAS LPAREN pexpr COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7) }
   ;

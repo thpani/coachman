@@ -2,14 +2,14 @@ def enq begin
   node := new;
   while true do
     tail := Tail;
-    nxt := tail.next;
-    if nxt = null then
-      if CAS(tail.next, nxt, node) then
-        CAS(Tail, tail, nxt);
+    next := tail.next;
+    if next = null then
+      if CAS(tail.next, next, node) then
+        CAS(Tail, tail, next);
         break;
       fi
     else
-      CAS(Tail, tail, nxt);
+      CAS(Tail, tail, next);
     fi
   od
 end
