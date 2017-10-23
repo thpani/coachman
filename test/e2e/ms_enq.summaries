@@ -1,7 +1,8 @@
 def enq begin
   assume(Tail.next = null);
-  node := new;
-  Tail.next := node;
+  __node := new;
+  Tail.next := __node;
+  __node := null;
 end
 
 def enq_swing begin
