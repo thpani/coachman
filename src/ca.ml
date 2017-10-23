@@ -81,7 +81,7 @@ type structure = { nodes : NodeSet.t ; succ : int SuccMap.t ; var : int VarMap.t
 type cloc = ploc * structure
 
 let pprint_structure ?(sep=", ") s =
-  Printf.sprintf "nodes: %s%s succs: %s%s vars: %s"
+  Printf.sprintf "nodes: %s%ssuccs: %s%svars: %s"
     (NodeSet.to_string s.nodes) sep
     (SuccMap.to_string s.succ) sep
     (VarMap.to_string s.var)
@@ -154,15 +154,19 @@ module SCC = Components.Make(G)
 
 let ctr_of_node n = Printf.sprintf "x_%d" n
 
+let error_sink = 
+  let error_ploc = -99 in
+  error_ploc, { nodes = NodeSet.empty; succ = SuccMap.empty; var = VarMap.empty }
+
 (* abstract transition / next heap structure for given structure / concrete statement {{{ *)
 
-let rec get_next hfrom =
+let rec get_next (lfrom, hfrom) stmts lto =
   let rec simplify_guard = let open Cfg in
     let var_eq a b =
       let get_node = function
         | Null  -> 0
-          | Id id -> VarMap.find id hfrom.var
-          | Next id -> SuccMap.find (VarMap.find id hfrom.var) hfrom.succ
+        | Id id -> VarMap.find id hfrom.var
+        | Next id -> raise (Invalid_argument "unsupported comparison with next. introduce __dummy := x.next and compare __dummy instead.")
     in (get_node a) = (get_node b)
     in
     function
@@ -194,7 +198,9 @@ let rec get_next hfrom =
     let succ = SuccMap.add m succ_n (SuccMap.add n m (SuccMap.remove n s.succ)) in
     { nodes ; succ ; var = s.var }
   in
-  function
+  if cloc_equal (lfrom, hfrom) error_sink then
+    [ [Assume True], error_sink ]
+  else match stmts with
   | [ s ] -> begin match s with
     | Cfg.Alloc Cfg.Null                -> raise (Invalid_argument "null is not a valid lvalue")
     | Cfg.Alloc(Cfg.Next _)             -> raise (Invalid_argument "allocation of .next not implemented")
@@ -205,10 +211,10 @@ let rec get_next hfrom =
         match vu with
         | None ->
             let var = VarMap.add u 0 hfrom.var in
-            [ [Assume True], { nodes = hfrom.nodes; succ = hfrom.succ; var } ]
+            [ [Assume True], (lto, { nodes = hfrom.nodes; succ = hfrom.succ; var }) ]
         | Some 0 -> 
             (* A1 *)
-            [ [Assume True], hfrom ]
+            [ [Assume True], (lto, hfrom) ]
         | Some n ->
             (* prem 1,2 of A2 *)
             let exists_w_neq_u_st_w_neq_bot = VarMap.exists (fun w vw -> w <> u && vw = n) hfrom.var in
@@ -226,7 +232,7 @@ let rec get_next hfrom =
               exists_w_neq_u_st_w_neq_bot (* A2 *) ||
               all_w_neq_u_st_Vofw_neq_n && n_has_two_preds (* A2' *) then
               let var = VarMap.add u 0 hfrom.var in
-              [ [Assume True], { nodes = hfrom.nodes ; succ = hfrom.succ ; var } ]
+              [ [Assume True], (lto, { nodes = hfrom.nodes ; succ = hfrom.succ ; var }) ]
             else 
               (* prem 3,4 of A2'' *)
               let preds_m_of_n = NodeSet.filter (fun m -> (SuccMap.find m hfrom.succ) = n) hfrom.nodes in
@@ -236,7 +242,7 @@ let rec get_next hfrom =
                 let m = List.hd (NodeSet.elements preds_m_of_n) in (* m is unique *)
                 let ctr_m = ctr_of_node m in
                 let ctr_n = ctr_of_node n in
-                [ [Asgn (ctr_m, Add(ctr_m, Id ctr_n))], merge { nodes = hfrom.nodes ; succ = hfrom.succ ; var } m n ]
+                [ [Asgn (ctr_m, Add(ctr_m, Id ctr_n))], (lto, merge { nodes = hfrom.nodes ; succ = hfrom.succ ; var } m n) ]
             else
               (* prem 2 of A3, A3' *)
               let forall_w_neq_u_st_w_notreach_n = VarMap.for_all (fun w vw -> w = u || not (reaches vw n hfrom.succ)) hfrom.var in
@@ -256,7 +262,7 @@ let rec get_next hfrom =
               let nodes = NodeSet.remove n hfrom.nodes in
               let succ = project_onto hfrom.succ nodes in
               let var = VarMap.add u 0 hfrom.var in
-              [ [Assume True], { nodes ; succ ; var } ]
+              [ [Assume True], (lto, { nodes ; succ ; var }) ]
             else
               (* prem 5,6 of A3''' *)
               let preds_of_succ_n = NodeSet.filter (fun p -> p <> n && (SuccMap.find p hfrom.succ) = succ_n) hfrom.nodes in
@@ -271,22 +277,22 @@ let rec get_next hfrom =
               let var = VarMap.add u 0 hfrom.var in
               let ctr_p = ctr_of_node p in
               let ctr_m = ctr_of_node succ_n in
-              [ [Asgn (ctr_p, Add(ctr_p, Id ctr_m))], merge { nodes ; succ ; var } p succ_n ]
+              [ [Asgn (ctr_p, Add(ctr_p, Id ctr_m))], (lto, merge { nodes ; succ ; var } p succ_n) ]
             else if
               forall_w_neq_u_st_w_notreach_n && succ_n <> 0 && succ_n <> n &&
               forall_w_neq_u_st_Vofw_neq_m && forall_p_neq_n_m_st_succ_p_neq_m (* A3'''' *) then
                 let nodes = NodeSet.remove succ_n (NodeSet.remove n hfrom.nodes) in
                 let succ = project_onto hfrom.succ nodes in
                 let var = VarMap.add u 0 hfrom.var in
-                [ [Assume True], { nodes ; succ ; var } ]
+                [ [Assume True], (lto, { nodes ; succ ; var }) ]
             else assert false
-    end
+    end (* Cfg.Asgn (Cfg.Id u, Cfg.Null) *)
     | Cfg.Asgn (Cfg.Id u, Cfg.Id w) -> (* A4 *)
         let vu = VarMap.find u hfrom.var in
         let vw = VarMap.find w hfrom.var in
         let var = VarMap.add u vw hfrom.var in
         assert (vu = 0) ;
-        [ [Assume True], { nodes = hfrom.nodes ; succ = hfrom.succ ; var } ]
+        [ [Assume True], (lto, { nodes = hfrom.nodes ; succ = hfrom.succ ; var }) ]
     | Cfg.Alloc (Cfg.Id u) -> (* A5 *)
         let vu = VarMap.find u hfrom.var in
         let n = next_free_node hfrom.nodes in
@@ -294,72 +300,77 @@ let rec get_next hfrom =
         let succ = SuccMap.add n 0 hfrom.succ in
         let var = VarMap.add u n hfrom.var in
         assert (vu = 0) ;
-        [ [Asgn (ctr_of_node n, Num 1)], { nodes ; succ ; var } ]
-    | Cfg.Asgn (Cfg.Id u, Cfg.Next w) -> (* A7, A7' *)
+        [ [Asgn (ctr_of_node n, Num 1)], (lto, { nodes ; succ ; var }) ]
+    | Cfg.Asgn (Cfg.Id u, Cfg.Next w) -> (* A6, A7, A7' *)
         let vu = VarMap.find u hfrom.var in
         let vw = VarMap.find w hfrom.var in
-        let succ_n = SuccMap.find vw hfrom.succ in
-        let m = next_free_node hfrom.nodes in
-        let var1 = VarMap.add u succ_n hfrom.var in
-        let var2 = VarMap.add u m hfrom.var in
-        let ctr_n = ctr_of_node vw in
-        let ctr_m = ctr_of_node m in
-        assert (vu = 0) ;
-        assert (vw <> 0) ; (* A6 *)
+        if (vw = 0) then (* A6 *)
+          [ [ Assume True ], error_sink ]
+        else (* A7, A7' *)
+          let succ_n = SuccMap.find vw hfrom.succ in
+          let m = next_free_node hfrom.nodes in
+          let var1 = VarMap.add u succ_n hfrom.var in
+          let var2 = VarMap.add u m hfrom.var in
+          let ctr_n = ctr_of_node vw in
+          let ctr_m = ctr_of_node m in
+          assert (vu = 0) ;
           [ 
-            [ Assume (Eq (ctr_n, 1)) ], { nodes = hfrom.nodes ; succ = hfrom.succ; var = var1 } ; 
-            [ Assume (Gt (ctr_n, 1)); Asgn (ctr_m, Add (ctr_n, Num (-1))); Asgn (ctr_n, Num 1) ], split { nodes = hfrom.nodes; succ = hfrom.succ; var = var2 } vw m
+            [ Assume (Eq (ctr_n, 1)) ], (lto, { nodes = hfrom.nodes ; succ = hfrom.succ; var = var1 }) ; 
+            [ Assume (Gt (ctr_n, 1)); Asgn (ctr_m, Add (ctr_n, Num (-1))); Asgn (ctr_n, Num 1) ], (lto, split { nodes = hfrom.nodes; succ = hfrom.succ; var = var2 } vw m)
           ]
-    | Cfg.Asgn (Cfg.Next u, Cfg.Null) ->
+    | Cfg.Asgn (Cfg.Next u, Cfg.Null) -> (* A8, A9 *)
         let n = VarMap.find u hfrom.var in
-        let succ_n = SuccMap.find n hfrom.succ in
-        let ctr_n = ctr_of_node n in
-        (* prem 4 of A9' *)
-        let exists_w_neq_u_st_Vofw_eq_m = VarMap.exists (fun w vw -> w <> u && vw = succ_n) hfrom.var in
-        (* prem 4 of A9'', A9''' *)
-        let forall_w_st_Vofw_neq_m = VarMap.exists (fun w vw -> vw <> succ_n) hfrom.var in
-        (* prem 5 of A3'' *)
-        let succ_n_has_two_preds_neq_n = NodeSet.exists (fun p -> p <> n &&
-          (NodeSet.exists (fun q -> q <> n && p <> q && (SuccMap.find p hfrom.succ) = succ_n && (SuccMap.find q hfrom.succ) = succ_n) hfrom.nodes)
-          ) hfrom.nodes in
-        if n <> 0 && (succ_n = 0 || succ_n = n) || (* A9 *)
-          n <> 0 && succ_n <> 0 && succ_n <> n && exists_w_neq_u_st_Vofw_eq_m (* A9' *) ||
-          n <> 0 && succ_n <> 0 && succ_n <> n && forall_w_st_Vofw_neq_m && succ_n_has_two_preds_neq_n (* A9'' *) then
-          let succ = SuccMap.add n 0 hfrom.succ in
-          [ [ Asgn (ctr_n, Num 1) ], { nodes = hfrom.nodes; succ; var = hfrom.var } ]
+        if (n = 0) then (* A8 *)
+          [ [ Assume True ], error_sink ]
         else
-          (* prem 5,6 of A9''' *)
-          let preds_of_succ_n = NodeSet.filter (fun p -> p <> n && (SuccMap.find p hfrom.succ) = succ_n) hfrom.nodes in
-          let succ_n_has_two_preds_neq_succ_n = (NodeSet.cardinal preds_of_succ_n) = 1 && (NodeSet.singleton succ_n) <> preds_of_succ_n in
-          if n <> 0 && succ_n <> 0 && succ_n <> n && forall_w_st_Vofw_neq_m && succ_n_has_two_preds_neq_succ_n (* A9''' *) then
-          let p = List.hd (NodeSet.elements preds_of_succ_n) in
-          let succ = SuccMap.add n 0 hfrom.succ in
-          let ctr_p = ctr_of_node p in
+          let succ_n = SuccMap.find n hfrom.succ in
           let ctr_n = ctr_of_node n in
-          let ctr_m = ctr_of_node succ_n in
-          (* A9''' *)
-          [ [ Asgn (ctr_n, Num 1) ; Asgn (ctr_p, Add (ctr_p, Id ctr_m)) ], merge { nodes = hfrom.nodes ; succ ; var = hfrom.var } p succ_n ]
-          else 
-          (* prem 4 of A3'''' *)
-          let forall_p_neq_n_m_st_succ_p_neq_m = NodeSet.for_all (fun p -> p = n || p = succ_n || (SuccMap.find p hfrom.succ) <> succ_n) hfrom.nodes in
-          let nodes = NodeSet.remove succ_n hfrom.nodes in
-          let succ = SuccMap.add n 0 (project_onto hfrom.succ nodes) in
-        
-            if n <> 0 && succ_n <> 0 && succ_n <> n && forall_w_st_Vofw_neq_m && forall_p_neq_n_m_st_succ_p_neq_m then
-              (* A9'''' *)
-              [ [ Asgn (ctr_n, Num 1) ], {nodes ; succ ; var = hfrom.var } ]
+          (* prem 4 of A9' *)
+          let exists_w_neq_u_st_Vofw_eq_m = VarMap.exists (fun w vw -> w <> u && vw = succ_n) hfrom.var in
+          (* prem 4 of A9'', A9''' *)
+          let forall_w_st_Vofw_neq_m = VarMap.exists (fun w vw -> vw <> succ_n) hfrom.var in
+          (* prem 5 of A3'' *)
+          let succ_n_has_two_preds_neq_n = NodeSet.exists (fun p -> p <> n &&
+            (NodeSet.exists (fun q -> q <> n && p <> q && (SuccMap.find p hfrom.succ) = succ_n && (SuccMap.find q hfrom.succ) = succ_n) hfrom.nodes)
+            ) hfrom.nodes in
+          if n <> 0 && (succ_n = 0 || succ_n = n) || (* A9 *)
+            n <> 0 && succ_n <> 0 && succ_n <> n && exists_w_neq_u_st_Vofw_eq_m (* A9' *) ||
+            n <> 0 && succ_n <> 0 && succ_n <> n && forall_w_st_Vofw_neq_m && succ_n_has_two_preds_neq_n (* A9'' *) then
+            let succ = SuccMap.add n 0 hfrom.succ in
+            [ [ Asgn (ctr_n, Num 1) ], (lto, { nodes = hfrom.nodes; succ; var = hfrom.var }) ]
           else
-            assert false
+            (* prem 5,6 of A9''' *)
+            let preds_of_succ_n = NodeSet.filter (fun p -> p <> n && (SuccMap.find p hfrom.succ) = succ_n) hfrom.nodes in
+            let succ_n_has_two_preds_neq_succ_n = (NodeSet.cardinal preds_of_succ_n) = 1 && (NodeSet.singleton succ_n) <> preds_of_succ_n in
+            if n <> 0 && succ_n <> 0 && succ_n <> n && forall_w_st_Vofw_neq_m && succ_n_has_two_preds_neq_succ_n (* A9''' *) then
+            let p = List.hd (NodeSet.elements preds_of_succ_n) in
+            let succ = SuccMap.add n 0 hfrom.succ in
+            let ctr_p = ctr_of_node p in
+            let ctr_n = ctr_of_node n in
+            let ctr_m = ctr_of_node succ_n in
+            (* A9''' *)
+            [ [ Asgn (ctr_n, Num 1) ; Asgn (ctr_p, Add (ctr_p, Id ctr_m)) ], (lto, merge { nodes = hfrom.nodes ; succ ; var = hfrom.var } p succ_n) ]
+            else 
+            (* prem 4 of A3'''' *)
+            let forall_p_neq_n_m_st_succ_p_neq_m = NodeSet.for_all (fun p -> p = n || p = succ_n || (SuccMap.find p hfrom.succ) <> succ_n) hfrom.nodes in
+            let nodes = NodeSet.remove succ_n hfrom.nodes in
+            let succ = SuccMap.add n 0 (project_onto hfrom.succ nodes) in
+          
+              if n <> 0 && succ_n <> 0 && succ_n <> n && forall_w_st_Vofw_neq_m && forall_p_neq_n_m_st_succ_p_neq_m then
+                (* A9'''' *)
+                [ [ Asgn (ctr_n, Num 1) ], (lto, {nodes ; succ ; var = hfrom.var }) ]
+            else
+              assert false
     | Cfg.Asgn (Cfg.Next u, Cfg.Id w) -> (* A10 *)
         let n = VarMap.find u hfrom.var in
         let vw = VarMap.find w hfrom.var in
         let succ_n = SuccMap.find n hfrom.succ in
         let succ = SuccMap.add n vw hfrom.succ in
         assert ((n <> 0) && (succ_n = 0)) ;
-        [ [ Assume True ], { nodes = hfrom.nodes ; succ ; var = hfrom.var } ]
+        [ [ Assume True ], (lto, { nodes = hfrom.nodes ; succ ; var = hfrom.var }) ]
     | Cfg.Assume g -> (match simplify_guard g with
-      | true -> [ [ Assume True ], hfrom ]
-      | false -> [ [ Assume False ], hfrom ]
+      | true -> [ [ Assume True ], (lto, hfrom) ]
+      | false -> [ [ Assume False ], (lto, hfrom) ]
     )
   end
     | stmts -> (* atomic sequence of statements *)
@@ -372,10 +383,11 @@ let rec get_next hfrom =
         let path, _ = Dijkstra.shortest_path bicfg (0, hfrom) final in
         let var = VarMap.filter (fun v n -> not (Str.string_match (Str.regexp "^__") v 0)) heap.var in
         let heap = { nodes = heap.nodes ; succ = heap.succ ; var } in
-        path, heap
+        path, (ploc, heap)
       ) final_vertices in
-      let paths_seq = List.map (fun (path, heap) ->
-        List.concat (List.map (fun (_, (stmt,_), _) -> stmt) path), heap
+      let paths_seq = List.map (fun (path, (ploc, heap)) ->
+        List.concat (List.map (fun (_, (stmt,_), _) -> stmt) path),
+        if cloc_equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
       ) paths in
       paths_seq
 and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
@@ -422,8 +434,8 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
     let from, from_heap = from_vertex in
     Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
       Debugger.logf Debugger.Info "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (pprint_cloc from_vertex) ;
-      let translated = get_next from_heap stmt in
-      List.iter (fun (tstmt, to_heap) ->
+      let translated = get_next from_vertex stmt to_ in
+      List.iter (fun (tstmt, (to_, to_heap)) ->
         let has_assume_false = List.mem (Assume False) tstmt in
         if has_assume_false && not introduce_assume_false then ()
         else begin
@@ -440,7 +452,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
           in
           let has_to_vertex = G.mem_vertex g to_vertex in
           G.add_edge_e g (from_vertex, (tstmt, summary), to_vertex) ;
-          if not has_assume_false && not has_to_vertex then Queue.add to_vertex q
+          if not has_assume_false && not has_to_vertex && not (cloc_equal to_vertex error_sink) then Queue.add to_vertex q
         end
       ) translated
       end
