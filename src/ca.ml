@@ -448,9 +448,10 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
   done ; g
 
 let structure_from_parsed_heap heap =
-  let nodes = List.fold_left (fun set (id, next, pvar) -> NodeSet.add id set) NodeSet.empty heap in
-  let succ = List.fold_left (fun map (id, next, pvar) -> SuccMap.add id next map) SuccMap.empty heap in
-  let var = List.fold_left (fun map (id, next, pvar) -> VarMap.add pvar id map) VarMap.empty heap in
+  let heapi = List.mapi (fun i (next, pvar) -> i, next, pvar) heap in
+  let nodes = List.fold_left (fun set (id, next, pvar) -> NodeSet.add id set) NodeSet.empty heapi in
+  let succ = List.fold_left (fun map (id, next, pvar) -> SuccMap.add id next map) SuccMap.empty heapi in
+  let var = List.fold_left (fun map (id, next, pvar) -> VarMap.add pvar id map) VarMap.empty heapi in
   { nodes ; succ ; var }
 
 let remove_summary_edges g =
