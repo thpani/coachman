@@ -134,6 +134,7 @@ end
 (* AST precompilation {{{ *)
 
 let dummy_var = "__l2ca_dummy"
+let get_dummy_var s = Printf.sprintf "%s_%s" dummy_var s
 
 (* Each pointer assignment of the form u := new, u := w, or u := w.next is
  * immediately preceded by an assignment of the form u := null. A pointer
@@ -142,8 +143,28 @@ let dummy_var = "__l2ca_dummy"
  * the form u.next := w is immediately preceded by u.next := null.
  *)
 let rec precompile_seq stmts = List.concat (List.map precompile_stmt stmts)
-and precompile_stmt = function
-  | Assume g                   -> [ Assume g ]
+and precompile_stmt =
+  let precompile_pexpr = function
+    | Null    -> [], Null
+    | Id id   -> [], Id id
+    | Next id -> let d = get_dummy_var id in [ id ], Id d
+  in
+  let rec precompile_bexpr = function
+    | True     -> [], True
+    | False    -> [], False
+    | Neg g    -> let l, g' = precompile_bexpr g in l, Neg g'
+    | Eq (a,b) -> 
+      let la, a' = precompile_pexpr a in
+      let lb, b' = precompile_pexpr b in
+        la @ lb, Eq (a',b')
+  in
+  function
+  | Assume g -> begin
+      let id_list, g' = precompile_bexpr g in
+      let asgn_dummy_vars = List.map (fun id -> Asgn(Id (get_dummy_var id), Next id)) id_list in
+      let null_dummy_vars = List.map (fun id -> Asgn (Id (get_dummy_var id), Null)) id_list in
+      (precompile_seq asgn_dummy_vars) @ [ Assume g' ] @ null_dummy_vars
+  end
   | Alloc Null                 -> raise (Invalid_argument "null is not a valid lvalue")
   | Alloc (Id id)              -> [ Asgn (Id id, Null) ; Alloc (Id id) ]
   | Alloc (Next _)             -> raise (Invalid_argument "allocation of .next not implemented")
