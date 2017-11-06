@@ -89,13 +89,13 @@ let pprint_structure ?(sep=", ") s =
 let pprint_cloc ?(sep=", ") (p, s) =
   Printf.sprintf "pc: %d%s%s" p sep (pprint_structure ~sep s)
 
+let structure_equal a b = 
+  let nodes_equal = NodeSet.equal a.nodes b.nodes in
+  let succ_equal = SuccMap.equal (=) a.succ b.succ in
+  let var_equal = VarMap.equal (=) a.var b.var in
+  nodes_equal && succ_equal && var_equal
+
 let cloc_equal (a_ploc, a_heap) (b_ploc, b_heap) =
-  let structure_equal a b = 
-    let nodes_equal = NodeSet.equal a.nodes b.nodes in
-    let succ_equal = SuccMap.equal (=) a.succ b.succ in
-    let var_equal = VarMap.equal (=) a.var b.var in
-    nodes_equal && succ_equal && var_equal
-  in
   a_ploc = b_ploc && (structure_equal a_heap b_heap)
 
 (* }}} *)
@@ -376,7 +376,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
     | stmts -> (* atomic sequence of statements *)
       Debugger.logf Debugger.Info "  ATOMIC TRANSITION COMPUTATION:\n" ;
       let cfg = Cfg.from_ast (Cfg.to_ast_stmt stmts) in
-      let bicfg = from_cfg ~indent:2 ~introduce_assume_false:true hfrom cfg in
+      let bicfg = from_cfg ~indent:2 ~introduce_assume_false:true [(0,hfrom),[]] cfg in
       let final_vertices = G.fold_vertex (fun v l -> match G.succ bicfg v with [] -> v :: l | _ -> l) bicfg [] in
       let paths = List.map (fun final -> 
         let ploc, heap = final in
@@ -390,7 +390,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
         if cloc_equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
       ) paths in
       paths_seq
-and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
+and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
   (* Rationale for `introduce_assume_false':
    * For ordinary CA construction, it makes no sense to follow atomic statements
    * that include an `assume(false)' and `introduce_assume_false' should be kept
@@ -426,8 +426,10 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
     | None -> None
   in
   (* add inital vertex to graph and worklist *)
-  G.add_vertex g (0, init_heap) ;
-  Queue.add (0, init_heap) q ;
+  List.iter (fun (init_cloc, _) ->
+    G.add_vertex g init_cloc ;
+    Queue.add init_cloc q
+  ) init_clocs ;
   (* while there are nodes in the worklist *)
   while not (Queue.is_empty q) do
     let from_vertex = Queue.pop q in
@@ -459,12 +461,33 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_heap cfg =
     ) cfg from
   done ; g
 
-let structure_from_parsed_heap heap =
-  let heapi = List.mapi (fun i (next, pvar) -> i+1, next, pvar) heap in
-  let nodes = List.fold_left (fun set (id, next, pvar) -> NodeSet.add id set) NodeSet.empty heapi in
-  let succ = List.fold_left (fun map (id, next, pvar) -> SuccMap.add id next map) SuccMap.empty heapi in
-  let var = List.fold_left (fun map (id, next, pvar) -> VarMap.add pvar id map) VarMap.empty heapi in
-  { nodes ; succ ; var }
+let structure_from_parsed_heaps heaps =
+  List.map (fun heap -> 
+    let nodes = List.fold_left (fun set (id, _, _, _) -> if id > 0 then NodeSet.add id set else set) NodeSet.empty heap in
+    let succ = List.fold_left (fun map (id, next, _, _) -> match next with
+      | Some n -> SuccMap.add id n map | None -> map
+    ) SuccMap.empty heap in
+    let var = List.fold_left (fun map (id, _, pvars, _) -> 
+      List.fold_left (fun m pvar -> VarMap.add pvar id m) map pvars
+    ) VarMap.empty heap in
+    let constr = List.fold_left (fun l (id,_,_,constr) -> match constr with
+      | Some u -> (ctr_of_node id, Apron.Interval.of_int 1 u)::l
+      | None -> l
+    ) [] heap in
+    (0, { nodes ; succ ; var }), constr
+  ) heaps
 
-let remove_summary_edges g =
-  G.iter_edges_e (fun (f, e, t) -> let _, summary = e in if summary > 0 then G.remove_edge_e g (f, e, t)) g
+let remove_unreachable_vertices initv cfg =
+  let module GChecker = Graph.Path.Check(G) in
+  let unreach_vertices = G.fold_vertex (fun v l ->
+    if not (GChecker.check_path (GChecker.create cfg) initv v) then v :: l else l
+  ) cfg [] in
+  List.iter (fun v -> G.remove_vertex cfg v) unreach_vertices ;
+  List.length unreach_vertices
+
+let remove_summary_edges ?(summary=None) g =
+  let pred = match summary with
+  | None   -> (fun summary -> summary > 0)
+  | Some s -> (fun summary -> summary = s)
+  in
+  G.iter_edges_e (fun (f, e, t) -> let _, summary = e in if pred(summary) then G.remove_edge_e g (f, e, t)) g
