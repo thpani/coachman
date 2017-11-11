@@ -437,6 +437,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
         if has_assume_false && not introduce_assume_false then ()
         else begin
           let tstmt = List.filter (fun stmt -> stmt <> Assume True) tstmt in
+          let tstmt = match tstmt with [] -> [ Assume True ] | _ -> tstmt in
           let to_vertex = to_, to_heap in
           Debugger.logf Debugger.Info "ca_construction" "%s%s%s (%s)" indent indent (pprint_cloc to_vertex) (pprint_seq ~sep:"; " tstmt) ;
           let tstmt, to_heap, to_vertex = match rename_max_node g tstmt to_vertex with
