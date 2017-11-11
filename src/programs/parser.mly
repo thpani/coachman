@@ -9,6 +9,7 @@
 %token ELSE
 %token FI
 %token BREAK
+%token CONTINUE
 %token WHILE
 %token DO
 %token OD
@@ -54,13 +55,14 @@ statement:
   | LANGLE seq_stmt RANGLE SEMI               { Atomic ($2) }
   | ASSUME LPAREN bexpr RPAREN SEMI           { Assume ($3) }
   | BREAK SEMI                                { Break }
+  | CONTINUE SEMI                             { Continue }
   | IF bexpr THEN seq_stmt ELSE seq_stmt FI   { IfThenElse ($2, $4, $6) }
   | IF bexpr THEN seq_stmt FI                 { IfThenElse ($2, $4, []) }
   | WHILE bexpr DO seq_stmt OD                { While ($2, $4) }
   | ID ASGN NEW SEMI                          { Alloc (Id $1) }
   | ID ASGN pexpr_null SEMI                   { Asgn (Id $1, $3) }
   | ID NEXT ASGN pexpr_null SEMI                { Asgn (Next $1, $4) }
-  | CAS LPAREN pexpr COMMA ID COMMA ID RPAREN SEMI { IfThenElse(CAS($3, $5, $7), [], []) }
+  | CAS LPAREN pexpr COMMA ID COMMA ID COMMA ID RPAREN SEMI { IfThenElse(CAS($3, $5, $7, $9), [], []) }
   ;
 
 pexpr:
@@ -78,5 +80,5 @@ bexpr:
   | FALSE { False }
   | pexpr EQ pexpr_null    { Eq($1, $3) }
   | NEG LPAREN bexpr RPAREN   { Neg($3) }
-  | CAS LPAREN pexpr COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7) }
+  | CAS LPAREN pexpr COMMA ID COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7, $9) }
   ;

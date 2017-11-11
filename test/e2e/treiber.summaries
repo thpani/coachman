@@ -2,6 +2,7 @@ def push begin
   __node := new;
   __node.next := ToS;
   ToS := __node;
+  __node := null;
 end
 
 def pop begin

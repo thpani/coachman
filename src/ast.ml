@@ -12,12 +12,13 @@ type bexpr =
   | False
   | Eq of pexpr * pexpr
   | Neg of bexpr
-  | CAS of pexpr * identifier * identifier
+  | CAS of pexpr * identifier * identifier * identifier
 
 type stmt =
   | Atomic of stmt list
   | Assume of bexpr
   | Break
+  | Continue
   | IfThenElse of bexpr * stmt list * stmt list
   | While of bexpr * stmt list
   | Alloc of pexpr
@@ -39,13 +40,14 @@ let rec pprint_bexpr = function
   | False -> "false"
   | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
   | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
-  | CAS (a, b, c) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
+  | CAS (a, b, c, _) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
 
 let rec pprint_stmt ?(sep=";\n") = function
   | Atomic s -> Printf.sprintf "< %s >" (pprint_seq ~sep:"; " s)
   | Assume g -> Printf.sprintf "assume(%s)" (pprint_bexpr g)
   | Break    -> "break"
-  | IfThenElse (CAS(a, b, c), [], []) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
+  | Continue -> "continue"
+  | IfThenElse (CAS(a, b, c, _), [], []) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
   | IfThenElse (g, sif, selse) -> String.concat "\n" [ "if " ^ (pprint_bexpr g) ; pprint_seq ~sep sif ; "else" ; pprint_seq ~sep selse ; "fi" ]
   | While (g, s)     -> String.concat "\n" [ "while " ^ (pprint_bexpr g) ^ " do" ; pprint_seq ~sep s ; "od" ]
   | Alloc p      -> Printf.sprintf "%s := new" (pprint_pexpr p)

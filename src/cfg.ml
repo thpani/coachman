@@ -45,7 +45,7 @@ let rec from_ast_stmt = List.map (function
   | Ast.Assume b -> Assume (from_ast_bexpr b)
   | Ast.Alloc p -> Alloc (from_ast_pexpr p)
   | Ast.Asgn (a, b) -> Asgn (from_ast_pexpr a, from_ast_pexpr b)
-  | Ast.Break | Ast.Atomic _ | Ast.IfThenElse _ | Ast.While _ -> raise (Invalid_argument "Should not appear as CFG stmt")
+  | s -> raise (Invalid_argument (Printf.sprintf "%s should not appear as CFG stmt" (Ast.pprint_stmt s)))
 )
 
 let to_ast_pexpr = function
@@ -190,28 +190,32 @@ let precompile cfg =
 let from_ast ast = 
   let last = ref 0 in
   let break_target = ref 0 in
+  let continue_target = ref 0 in
   let did_break = ref false in
   let g = G.create() in
   let max_vertex g = G.fold_vertex (fun v a -> max v a) g 0 in
   let next_vertex g = (max_vertex g) + 1 in
   let rec gen_cfg ast =
-    List.iter (fun stmt ->
-      match stmt with
+    List.iter (function
       | Ast.IfThenElse (guard, sif, selse) ->
           (* rewrite CAS statements used as conditional *)
-          let if_guard, else_guard =
-            let open Ast in
-            match guard with
-            | Ast.CAS (a,b,c) ->
+          let if_guard, else_guard = let open Ast in match guard with
+            | Ast.CAS (a,b,c,d) ->
                 let succ_cas = Atomic [ Assume (Eq(a, Id b)) ; Asgn(a, Id c) ] in
                 let fail_cas = Atomic [ Assume(Neg(Eq(a, Id b))) ] in
-                succ_cas, fail_cas
-            | _ -> Assume guard, Assume (Neg guard)
+                (succ_cas,d), fail_cas
+            | _ -> (Assume guard, ""), Assume (Neg guard)
             in
-            let sif = if_guard :: sif in
             let selse = else_guard :: selse in
             let last_before_if = !last in
             let last_after_if = ref 0 in
+            begin
+              let next_v = next_vertex g in
+              let if_guard, summary = if_guard in
+              match if_guard with 
+              | Ast.Atomic s -> G.add_edge_e g (!last, (from_ast_stmt s, E summary), next_v) ; last := next_v
+              | _ -> gen_cfg [if_guard]
+            end ;
               gen_cfg sif ;
               last_after_if := !last ;
               last := last_before_if ;
@@ -221,11 +225,12 @@ let from_ast ast =
                 did_break := false ;
                 last := nv
       | Ast.While(guard, stmts) ->
-          let before_branch = !last in
-          let after_branch = next_vertex g in
+          let loop_head = !last in
+          let loop_exit = next_vertex g in
           let stmts = Ast.Assume(guard) :: stmts in
-          break_target := after_branch ;
-          G.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], 0), after_branch) ;
+          break_target := loop_exit ;
+          continue_target := loop_exit ;
+          G.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], effect_id), loop_exit) ;
           gen_cfg stmts ;
           G.add_edge_e g (!last, ([Assume True], 0), before_branch) ;
           last := max_vertex g

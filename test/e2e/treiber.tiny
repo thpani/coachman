@@ -3,7 +3,7 @@ def push begin
   while true do
     top := ToS;
     node.next := top;
-    if CAS(ToS, top, node) then
+    if CAS(ToS, top, node, push) then
       break;
     fi
   od
@@ -16,7 +16,7 @@ def pop begin
       break;
     fi
     node := top.next;
-    if CAS(ToS, top, node) then
+    if CAS(ToS, top, node, pop) then
       break;
     fi
   od
