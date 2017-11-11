@@ -392,7 +392,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
    * that include an `assume(false)' and `introduce_assume_false' should be kept
    * at `false'.
    * However, if we construct a CA for an atomic statement (in order to later
-   * read off statements off its paths), we need to keep the `assume(false)'
+   * read statements off its paths), we need to keep the `assume(false)'
    * *in* the CA to retain semantic equivalence. We still stop exploring the
    * path *after* the `assume(false)'.
    *)
@@ -456,6 +456,8 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
       end
     ) cfg from
   done ; g
+
+(* }}} *)
 
 let structure_from_parsed_heaps heaps =
   List.map (fun heap -> 
