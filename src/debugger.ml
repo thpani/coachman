@@ -17,5 +17,7 @@ let lvl_of_string = function
 
 let current_level = ref Warn
 
-let logf lvl =
-  if ord lvl >= ord !current_level then printf else ifprintf stdout
+let logf lvl component =
+  if component = "bound" then
+    if ord lvl >= ord !current_level then printf else ifprintf stdout
+  else ifprintf stdout

@@ -374,7 +374,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
     )
   end
     | stmts -> (* atomic sequence of statements *)
-      Debugger.logf Debugger.Info "  ATOMIC TRANSITION COMPUTATION:\n" ;
+      Debugger.logf Debugger.Info "ca_construction" "  ATOMIC TRANSITION COMPUTATION:\n" ;
       let cfg = Cfg.from_ast (Cfg.to_ast_stmt stmts) in
       let bicfg = from_cfg ~indent:2 ~introduce_assume_false:true [(0,hfrom),[]] cfg in
       let final_vertices = G.fold_vertex (fun v l -> match G.succ bicfg v with [] -> v :: l | _ -> l) bicfg [] in
@@ -435,7 +435,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
     let from_vertex = Queue.pop q in
     let from, from_heap = from_vertex in
     Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
-      Debugger.logf Debugger.Info "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (pprint_cloc from_vertex) ;
+      Debugger.logf Debugger.Info "ca_construction" "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (pprint_cloc from_vertex) ;
       let translated = get_next from_vertex stmt to_ in
       List.iter (fun (tstmt, (to_, to_heap)) ->
         let has_assume_false = List.mem (Assume False) tstmt in
@@ -443,13 +443,13 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
         else begin
           let tstmt = List.filter (fun stmt -> stmt <> Assume True) tstmt in
           let to_vertex = to_, to_heap in
-          Debugger.logf Debugger.Info "%s%s%s (%s)" indent indent (pprint_cloc to_vertex) (pprint_seq ~sep:"; " tstmt) ;
+          Debugger.logf Debugger.Info "ca_construction" "%s%s%s (%s)" indent indent (pprint_cloc to_vertex) (pprint_seq ~sep:"; " tstmt) ;
           let tstmt, to_heap, to_vertex = match rename_max_node g tstmt to_vertex with
           | Some (rename_from, rename_to, renamed_structure) ->
-              Debugger.logf Debugger.Info " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (pprint_cloc to_vertex) (pprint_seq ~sep:"; " tstmt) ;
+              Debugger.logf Debugger.Info "ca_construction" " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (pprint_cloc to_vertex) (pprint_seq ~sep:"; " tstmt) ;
               tstmt @ [ Asgn (ctr_of_node rename_to, Id (ctr_of_node rename_from)) ], renamed_structure, (to_, renamed_structure)
           | None ->
-              Debugger.logf Debugger.Info "\n" ;
+              Debugger.logf Debugger.Info "ca_construction" "\n" ;
               tstmt, to_heap, (to_, to_heap)
           in
           let has_to_vertex = G.mem_vertex g to_vertex in
