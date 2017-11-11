@@ -144,7 +144,6 @@ module W_ = struct
 end
 
 module Dijkstra = Path.Dijkstra(G)(W_)
-module SCC = Components.Make(G)
 
 (* }}} *)
 
