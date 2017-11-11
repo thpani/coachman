@@ -1,6 +1,11 @@
 open Apron
 open Ca
 
+(* USAGE: *)
+(* let man, env, abs_map = Ai.do_abstract_computation_initial_values init_heaps ca in *)
+(* let num_inf = Ai.remove_infeasible man env abs_map ca in *)
+(* Printf.printf "Removing infeasible edges (%d)...\n" num_inf ; *)
+
 (* data structure module declarations {{{ *)
 
 module AbsMap = Map.Make(struct
