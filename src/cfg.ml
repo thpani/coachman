@@ -23,6 +23,12 @@ type stmt =
 type ploc = int
 type summary_id = int
 
+type edge_type = E of string | S of string
+let pprint_edge_type = function
+  | E name -> Printf.sprintf "Effect %s" name
+  | S name -> Printf.sprintf "Summary %s" name
+let effect_id = E "ID"
+
 (* }}} *)
 
 let ttolit = function true -> True | false -> False
@@ -100,9 +106,9 @@ module V_ = struct
 end
 
 module E_ = struct
-  type t = stmt list * summary_id
+  type t = stmt list * edge_type
   let compare = compare
-  let default = [ Assume True ], 0
+  let default = [ Assume True ], E "Id"
 end
 
 module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
@@ -116,11 +122,7 @@ module Dot_ = Graphviz.Dot (struct
   let default_vertex_attributes _ = []
   let vertex_attributes _ = []
   let default_edge_attributes _ = []
-  let edge_attributes (v1, (stmt, summary), v2) = [
-    `Label (pprint_seq stmt) ;
-    `Color (Colormap.get_color summary) ;
-    `Fontcolor (Colormap.get_color summary)
-  ]
+  let edge_attributes (v1, (stmt, summary), v2) = [ `Label (pprint_seq stmt) ]
   let get_subgraph _ = None
 end)
 
@@ -222,7 +224,7 @@ let from_ast ast =
               last := last_before_if ;
               gen_cfg selse ;
               let nv = if !did_break then next_vertex g else !last_after_if in
-              G.add_edge_e g (!last, ([Assume True], 0), nv) ;
+              G.add_edge_e g (!last, ([Assume True], effect_id), nv) ;
                 did_break := false ;
                 last := nv
       | Ast.While(guard, stmts) ->
@@ -233,17 +235,19 @@ let from_ast ast =
           continue_target := loop_exit ;
           G.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], effect_id), loop_exit) ;
           gen_cfg stmts ;
-          G.add_edge_e g (!last, ([Assume True], 0), before_branch) ;
+          G.add_edge_e g (!last, ([Assume True], effect_id), loop_head) ;
           last := max_vertex g
       | Ast.Break ->
-          G.add_edge_e g (!last, ([Assume True], 0), !break_target) ;
+          G.add_edge_e g (!last, ([Assume True], effect_id), !break_target) ;
           did_break := true
+      | Ast.Continue ->
+          G.add_edge_e g (!last, ([Assume True], effect_id), !continue_target) ;
       | Ast.Atomic stmt ->
         let next_v = next_vertex g in
-        G.add_edge_e g (!last, (from_ast_stmt stmt, 0), next_v) ; last := next_v
+        G.add_edge_e g (!last, (from_ast_stmt stmt, effect_id), next_v) ; last := next_v
       | stmt ->
         let next_v = next_vertex g in
-        G.add_edge_e g (!last, (from_ast_stmt [stmt], 0), next_v) ; last := next_v
+        G.add_edge_e g (!last, (from_ast_stmt [stmt], effect_id), next_v) ; last := next_v
     ) ast
   in
   gen_cfg ast ;
@@ -277,10 +281,10 @@ let from_ast ast =
 (* }}} *)
 
 let add_summaries cfg summaries =
-  List.iteri (fun i (summary_name, summary) ->
-    let summary_seq = Ast.unwrap_atomic summary in
+  List.iter (fun (summary_name, stmts) ->
+    let summary_seq = Ast.unwrap_atomic stmts in
     let summary_nested_list = from_ast_stmt summary_seq in
-    G.iter_vertex (fun v -> G.add_edge_e cfg (v, (summary_nested_list, i+1), v)) cfg
+    G.iter_vertex (fun v -> G.add_edge_e cfg (v, (summary_nested_list, S summary_name), v)) cfg
   ) summaries
 
 let scc_edges g = 

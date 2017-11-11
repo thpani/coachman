@@ -112,9 +112,9 @@ end
 type summary_id = int
 
 module E_ = struct
-  type t = stmt list * summary_id
+  type t = stmt list * Cfg.edge_type
   let compare = compare
-  let default = [ Assume True ], 0
+  let default = [ Assume True ], Cfg.effect_id
 end
 
 module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
@@ -126,11 +126,7 @@ module Dot_ = Graphviz.Dot (struct
   let default_vertex_attributes _ = [`Shape `Box; `Regular false]
   let vertex_attributes c = [`Label (pprint_cloc ~sep:"\n" c)]
   let default_edge_attributes _ = []
-  let edge_attributes (v1, (stmt, summary), v2) = [
-    `Label (pprint_seq stmt) ;
-    `Color (Colormap.get_color summary) ;
-    `Fontcolor (Colormap.get_color summary)
-  ]
+  let edge_attributes (v1, (stmt, summary), v2) = [ `Label (pprint_seq stmt) ]
   let get_subgraph _ = None
 end)
 module Dot = struct
@@ -485,10 +481,12 @@ let remove_unreachable_vertices initv cfg =
   List.iter (fun v -> G.remove_vertex cfg v) unreach_vertices ;
   List.length unreach_vertices
 
-let remove_summary_edges ?(summary=None) g =
-  let pred = match summary with
-  | None   -> (fun summary -> summary > 0)
-  | Some s -> (fun summary -> summary = s)
+let remove_summary_edges ?(summary_name=None) g =
+  let pred = match summary_name with
+  | None   -> (function Cfg.S n -> true  | _ -> false)
+  | Some s -> (function Cfg.S n -> n = s | _ -> false)
+  in
+  G.iter_edges_e (fun edge -> let f,(_, summary),t = edge in if pred(summary) then G.remove_edge_e g edge) g
 
 let collect_vars cfg =
   let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
