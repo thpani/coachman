@@ -107,6 +107,7 @@ end
 
 module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
 module GChecker = Path.Check(G)
+module SCC = Components.Make(G)
 
 module Dot_ = Graphviz.Dot (struct
   include G
@@ -281,3 +282,19 @@ let add_summaries cfg summaries =
     let summary_nested_list = from_ast_stmt summary_seq in
     G.iter_vertex (fun v -> G.add_edge_e cfg (v, (summary_nested_list, i+1), v)) cfg
   ) summaries
+
+let scc_edges g = 
+  let scc_list = SCC.scc_list g in
+  List.map (fun scc_vertices ->
+    (* for this SCC... *)
+    List.fold_left (fun l scc_vertex_from ->
+      (* and this vertex, get all edges to successors that are also in the same SCC *)
+      let scc_vertex_from_succs_in_scc = List.fold_left (fun l edge ->
+        let from, _, to_ = edge in
+        let to_in_same_scc = List.mem to_ scc_vertices in
+        if to_in_same_scc then (from,to_) :: l else l
+      ) [] (G.succ_e g scc_vertex_from)
+      in
+      scc_vertex_from_succs_in_scc @ l
+    ) [] scc_vertices
+  ) scc_list
