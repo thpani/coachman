@@ -489,5 +489,32 @@ let remove_summary_edges ?(summary=None) g =
   let pred = match summary with
   | None   -> (fun summary -> summary > 0)
   | Some s -> (fun summary -> summary = s)
+
+let collect_vars cfg =
+  let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
+  let max_node = G.fold_vertex (fun (ploc, heap) m ->
+    match NodeSet.max_elt_opt heap.nodes with
+      | Some n -> max n m
+      | None -> m
+  ) cfg 0 in
+  let vars_vertex = List.map ctr_of_node (1--max_node) in
+  let collect_vars_seq =
+    let rec collect_vars_nexpr = function
+      | Id id       -> [id]
+      | Num _       -> []
+      | Add (id, e) -> id :: (collect_vars_nexpr e)
+    in
+    let rec collect_vars_bexpr = function
+      | True | False            -> []
+      | Eq (id, _) | Gt (id, _) -> [id]
+      | Neg e                   -> collect_vars_bexpr e
+    in
+    let collect_vars_stmt = function
+      | Assume e     -> collect_vars_bexpr e
+      | Asgn (id, e) -> id :: (collect_vars_nexpr e)
+    in
+    List.fold_left (fun l stmt -> (collect_vars_stmt stmt) @ l) []
   in
-  G.iter_edges_e (fun (f, e, t) -> let _, summary = e in if pred(summary) then G.remove_edge_e g (f, e, t)) g
+  let vars_edge = G.fold_edges_e (fun (_, (stmts, _), _) l -> (collect_vars_seq stmts) @ l) cfg [] in
+  let id_list = List.sort_uniq compare (vars_vertex @ vars_edge) in
+  id_list
