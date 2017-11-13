@@ -1,7 +1,7 @@
 open Ca
 open Ca_rel.Abstract
-
 open Debugger
+open Util
 
 let scc_edges g = 
   let scc_list = SCC.scc_list g in
@@ -19,21 +19,26 @@ let scc_edges g =
     ) [] scc_vertices
   ) scc_list
 
-type bound = Const of int | Var of identifier list | Unbounded
+module Candidate = struct
+  type bound = Const of int | Var of StringSet.t | Unbounded
 
-let pprint_bound = function 
-  | Const i -> string_of_int i
-  | Var l -> begin match l with
-    | [ var ] -> var
-    | l -> "one of: {" ^ (String.concat ", " l) ^ "}"
-  end
-  | Unbounded -> "∞"
-let pprint_bound_factor factor = function
-  | Const 0 -> "0"
-  | Const 1 -> factor
-  | Unbounded -> "∞"
-  | bound ->  Printf.sprintf "%s × (%s)" (pprint_bound bound) factor
-let pprint_bound_list l = String.concat " + " (List.map pprint_bound l)
+  let pprint_bound = function 
+    | Const i -> string_of_int i
+    | Var l -> StringSet.to_string l
+    | Unbounded -> "∞"
+  let pprint_bound_factor factor = function
+    | Const 0 -> "0"
+    | Const 1 -> factor
+    | Unbounded -> "∞"
+    | bound ->  Printf.sprintf "%s × (%s)" (pprint_bound bound) factor
+end
+
+module EnvBoundMap = Map.Make(String)
+
+type bound = Bound of Z3.Expr.expr | Unbounded
+let pprint_bound = function
+| Bound e -> Z3.Expr.to_string e
+| Unbounded -> "∞"
 
 let pprint_edge (f,_,t) = Printf.sprintf "%s -> %s" (pprint_cloc f) (pprint_cloc t)
 
@@ -48,35 +53,32 @@ let edge_in_scc edge scc =
 let get_local_bounds vars ca =
   let sccs = scc_edges ca in
   let local_bounds = List.map (fun scc ->
-    let var_edge_list = List.map (fun var ->
+    let var_edge_map = StringSet.fold (fun var map ->
       let edges_ranked_by_var = List.filter (fun edge -> (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
         let _,(dc,_),_ = edge in
         let decreases_on_edge = (List.assoc var dc) = Strict in
         let increases_in_scc = List.fold_left (fun b (_,(dc,_),_) -> b || ((List.assoc var dc) = DontKnow)) false scc in
         decreases_on_edge && (not increases_in_scc)
       ) scc in
-      var, edges_ranked_by_var
-    ) vars in
+      StringMap.add var edges_ranked_by_var map
+    ) vars StringMap.empty in
     (* List.iter (fun (var, edges_ranked_by_var) -> *)
     (*   Printf.printf "Variable %s ranks edges:\n" var ; *)
     (*   List.iter (fun edge -> Printf.printf "  %s" (pprint_edge edge)) edges_ranked_by_var *)
-    (* ) var_edge_list ; *)
+    (* ) var_edge_map ; *)
     List.map (fun edge ->
       Debugger.logf Debugger.Info "bound" "  Edge %s " (pprint_edge edge) ;
       (* (2) Let v ∈ V. We define ξ(v) ⊆ E to be the set of all transitions τ = l1 → l2 ∈ E such that v' ≤ v + c ∈ u for some c < 0. For all τ ∈ ξ(v) we set ζ(τ) = v. *)
       let local_bound =
-        let ranking_vars = List.filter (fun var ->
-          let edges_ranked_by_var = List.assoc var var_edge_list in
+        let ranking_vars = StringSet.filter (fun var ->
+          let edges_ranked_by_var = StringMap.find var var_edge_map in
           List.exists (edge_equal edge) edges_ranked_by_var
         ) vars in
-        if (List.length ranking_vars) > 0 then begin
-          Debugger.logf Debugger.Info "bound" "ranked by %s.\n" (String.concat ", " ranking_vars) ;
-          Var ranking_vars
-        end else begin
+        if StringSet.is_empty ranking_vars then begin
           Debugger.logf Debugger.Info "bound" "ranked by none. " ;
           (* (3) Let v ∈ V and τ ∈ E. Assume τ was not yet assigned a local bound by (1) or (2). We set ζ(τ) = v, if τ does not belong to a strongly connected component (SCC) of the directed graph (L, E′) where E′ = E \ {ξ(v)} (the control flow graph of ∆P without the transitions in ξ(v)). *)
-          let ranking_vars = List.filter (fun var ->
-            let edges_ranked_by_var = List.assoc var var_edge_list in
+          let ranking_vars = StringSet.filter (fun var ->
+            let edges_ranked_by_var = StringMap.find var var_edge_map in
             let scc_without_edges_ranked_by_var = List.filter (fun edge ->
               let is_edge_ranked_by_var = List.exists (edge_equal edge) edges_ranked_by_var in
               not is_edge_ranked_by_var
@@ -84,9 +86,16 @@ let get_local_bounds vars ca =
             let var_breaks_scc = not (edge_in_scc edge scc_without_edges_ranked_by_var) in
             var_breaks_scc
           ) vars in
-          match ranking_vars with
-          | [] -> Debugger.logf Debugger.Info "bound" "Unbounded.\n" ; Unbounded
-          | _  -> Debugger.logf Debugger.Info "bound" "Vars breaking SCC: %s\n" (String.concat ", " ranking_vars) ; Var ranking_vars
+          if StringSet.is_empty ranking_vars then begin
+            Debugger.logf Debugger.Info "bound" "Unbounded.\n" ;
+            Candidate.Unbounded
+          end else begin
+            Debugger.logf Debugger.Info "bound" "Vars breaking SCC: %s\n" (StringSet.to_string ranking_vars) ;
+            Candidate.Var ranking_vars
+          end
+        end else begin
+          Debugger.logf Debugger.Info "bound" "ranked by %s.\n" (StringSet.to_string ranking_vars) ;
+          Candidate.Var ranking_vars
         end
       in edge, local_bound
     ) scc
@@ -96,52 +105,79 @@ let get_local_bounds vars ca =
     let (f,_),_,(t,_) = edge in
     let local_bound = match List.assoc_opt edge local_bounds with
     | Some lb -> lb
-    | None -> Const 1
+    | None -> Candidate.Const 1
     in
     ((f,t),local_bound) :: l
   ) ca []
 
-module EnvBoundMap = Map.Make(String)
-module VarSet = Set.Make(String)
-
 let summary_ctr summary_name = Printf.sprintf "summary_ctr_%s" summary_name
+let get_summary_of_summary_ctr id =
+  if Str.string_match (Str.regexp "^summary_ctr_\\(.*\\)") id 0 then
+    Some (Str.matched_group 1 id)
+  else None
 
 let pprint_env_bound_map map = String.concat "; " (List.map (fun (summary_name, bound) ->
-  Printf.sprintf "%s = %s" (summary_ctr summary_name) (pprint_bound_factor "N-1" bound)
+  Printf.sprintf "%s = %s" (summary_ctr summary_name) (pprint_bound bound)
 ) (EnvBoundMap.bindings map))
 
 let get_refined_env_bounds effect_name env_bounds = function
   | []     -> raise (Invalid_argument "Expect at least one local bound; infeasible edges should be assigned Const 0.")
   | [ lb ] -> begin match lb with
-    | Const i -> EnvBoundMap.add effect_name lb env_bounds
+    | Candidate.Const i -> EnvBoundMap.add effect_name lb env_bounds
     | _ -> env_bounds (* TODO bounded by variable *)
   end
   | _ -> env_bounds (* TODO multiple abstract edges with different ranking functions *)
 
-let fold_bounds bounds =
+let hitting_set_approx vars =
+  (* Select minimal set of variables present in all Var bounds.
+  * The optimal solution for sum-of-vars would be computing the hitting set (NP-complete).
+  * We approximate this by
+  * (1) checking the intersection over all variable sets.
+  * (2) greedily picking one variable from each variable set. *)
+  let common_vars = match vars with
+    | varset :: tail -> StringSet.elements (List.fold_left StringSet.inter varset vars)
+    | []             -> []
+  in
+  match common_vars with
+    | [] -> List.map StringSet.min_elt vars
+    | _  -> common_vars
+
+let fold_bounds ctx env_bound_map bounds =
   let c, unbounded, vars = List.fold_left (fun (const_carry, unbounded_carry, var_carry) bound ->
-    match bound with
+    let open Candidate in match bound with
     | Const i   -> const_carry + i, unbounded_carry, var_carry
     | Unbounded -> const_carry    , true           , var_carry
-    | Var  vars -> const_carry    , unbounded_carry, (VarSet.of_list vars) :: var_carry
+    | Var  vars -> const_carry    , unbounded_carry, vars :: var_carry
   ) (0,false,[]) bounds in
-  if unbounded then [ Unbounded ]
-  else match vars with
-  | [] -> [ Const c ]
-  | _ ->
-    (* The optimal solution for sum-of-vars would be computing the hitting set (NP-complete).
-     * We approximate this by
-     * (1) checking the intersection over all variable sets.
-     * (2) greedily picking one variable from each variable set. *)
-    let common_vars = match vars with
-      | varset :: tail -> List.fold_left VarSet.inter varset vars
-      | []             -> VarSet.empty
-    in
-    let some_vars = List.sort_uniq compare (List.map (fun vars -> Var [VarSet.min_elt vars]) vars) in
-    let vars =
-      if VarSet.is_empty common_vars then some_vars
-      else [Var (VarSet.elements common_vars)] in
-      if c > 0 then (Const c) :: vars else vars
+  if unbounded then Unbounded
+  else
+    let vars = hitting_set_approx vars in
+    let var_bounds = List.map (fun var ->
+      (* TODO bound other variables *)
+      match get_summary_of_summary_ctr var with
+      | Some summary -> EnvBoundMap.find summary env_bound_map
+      | None -> Unbounded
+    ) vars in
+    if List.mem Unbounded var_bounds then
+      Unbounded
+    else
+      let c_expr = Ca_rel.mk_numeral ctx c in
+      let var_bound_exprs = List.map (function Bound e -> e | Unbounded -> assert false) var_bounds in
+      let sum_expr = Z3.Arithmetic.mk_add ctx (c_expr :: var_bound_exprs) in
+      Bound (Z3.Expr.simplify sum_expr None)
+
+let multiply_by_env_num ctx = function
+  | Unbounded  -> Unbounded
+  | Bound expr ->
+      let n = Ca_rel.mk_const ctx 0 "N" in
+      let one = Ca_rel.mk_numeral ctx 1 in
+      let env_num = Z3.Arithmetic.mk_sub ctx [ n ; one ] in
+      let mult_expr = Z3.Arithmetic.mk_mul ctx [ expr ; env_num ] in
+      Bound (Z3.Expr.simplify mult_expr None)
+
+let const_bound ctx i = Bound (Ca_rel.mk_numeral ctx i)
+let const_bound_0 ctx = const_bound ctx 0
+let const_bound_1 ctx = const_bound ctx 1
 
 let refine_ca_with_env_bounds ca_rel_abstract env_bound_map =
   let env_bound_constr edge_type = EnvBoundMap.fold (fun summary_name bound result ->
@@ -161,32 +197,38 @@ let refine_ca_with_env_bounds ca_rel_abstract env_bound_map =
   ) ca_rel_abstract G.empty
 
 let compute_bounds cfg ca =
-  let summaries, effects = Cfg.G.fold_edges_e (fun e (summaries, effects) ->
-    let _, (_,summary_ref), _ = e in
+  let summaries, effects = Cfg.G.fold_edges_e (fun (_,(_,summary_ref),_) (summaries, effects) ->
     match summary_ref with
-    | Cfg.S id -> id :: summaries, effects
-    | Cfg.E name -> summaries, name :: effects
-  ) cfg ([], []) in
-  let summaries, effects = List.sort_uniq compare summaries, List.sort_uniq compare effects in
-  (* summary_name |-> bound *)
-  let env_bound_map = ref (List.fold_left (fun map summary_name ->
+    | Cfg.S name -> StringSet.add name summaries,                    effects
+    | Cfg.E name ->                    summaries, StringSet.add name effects
+  ) cfg (StringSet.empty, StringSet.empty) in
+
+  (* Z3 context for constructing expressions *)
+  let ctx = Z3.mk_context [] in
+
+  (* Map summary names to bounds (bounds the summary counter from above) *)
+  let env_bound_map = ref (StringSet.fold (fun summary_name map ->
     let initial_bound =
       (* initial bound is 0 if there is no CFG edge causing that effect, otherwise unbounded *)
-      if List.mem summary_name effects then Unbounded
-      else Const 0
+      if StringSet.mem summary_name effects then Unbounded
+      else const_bound_0 ctx
     in
     EnvBoundMap.add summary_name initial_bound map
-  ) EnvBoundMap.empty summaries) in
+  ) summaries EnvBoundMap.empty) in
 
-  let vars = (Ca.collect_vars ca) @ (List.map summary_ctr summaries) in
+  let vars =
+    let ca_vars = StringSet.of_list (Ca.collect_vars ca) in
+    let summary_vars = StringSet.map summary_ctr summaries in
+    StringSet.union ca_vars summary_vars
+  in
 
   Printf.printf "Abstracting...\n%!" ;
   let ca_rel_abstract = Ca_rel.Abstract.of_ca ca in
   let ca_rel_abstract = refine_ca_with_env_bounds ca_rel_abstract !env_bound_map in
   let ca_rel_abstract = ref ca_rel_abstract in
-  Printf.printf "%!" ;
   Ca_rel.Abstract.Dot.write_dot !ca_rel_abstract "rel_abstr.dot" ;
 
+  Printf.printf "Computing bounds...\n%!" ;
 
   let cfg_scc_edges = List.concat (Cfg.scc_edges cfg) in
 
@@ -202,17 +244,20 @@ let compute_bounds cfg ca =
     let edge_bound_map = Cfg.G.fold_edges_e (fun (f, (_,edge_type), t) result ->
       (* For edge f->t, get a list of local bounds (at most one for each f->t edge in the CA) *)
       let local_bounds =
-        let ca_edge_local_bounds = fold_bounds (get_ca_local_bounds f t) in
+        let ca_edge_local_bounds = get_ca_local_bounds f t in
         (* Check feasibility by checking whether an edge f->t its present in the CA. *)
         match ca_edge_local_bounds with
-          | [] -> [ Const 0 ]  (* There is no f->t edge in the CA. Thus f->t is infeasible. *)
+          | [] ->
+            (* There is no f->t edge in the CA. Thus f->t is infeasible. *)
+            const_bound_0 ctx
           | _  ->
-            (* Check if edge does not belong to an SCC in the CFG.
-             * This gets us better constants than testing on the CA; edges may be 
-             * doubled there because of the refined control structure. *)
+            (* Check if edge belongs to an SCC in the CFG.
+             * If not, return constant bound 1. This gets us better constants
+             * than testing on the CA; edges may be doubled there because of the
+             * refined control structure. *)
             let edge_belongs_to_cfg_scc = List.mem (f,t) cfg_scc_edges in
-            if edge_belongs_to_cfg_scc then ca_edge_local_bounds
-            else [ Const 1 ]
+            if edge_belongs_to_cfg_scc then fold_bounds ctx !env_bound_map ca_edge_local_bounds
+            else const_bound_1 ctx
       in ((f,edge_type,t),local_bounds) :: result
     ) cfg [] in
 
@@ -224,17 +269,14 @@ let compute_bounds cfg ca =
         | _ -> false
       ) edge_bound_map in
       let lb = match edge_bound_map_of_summary with
-      | []            -> Const 0 (* there is no edge causing this effect *)
-      | [ _, bounds ] -> begin match bounds with
-        | [ bound ] -> bound
-        | _ -> Unbounded
-      end
-      | _             -> assert (false) (* there must not be >1 edges causing one specific effect *)
+      | []           -> const_bound_0 ctx (* there is no edge causing this effect *)
+      | [ _, bound ] -> multiply_by_env_num ctx bound (* the edge is bounded by `bound'; multiply by (N-1) *)
+      | _            -> assert false (* there must not be >1 edges causing one specific effect *)
       in EnvBoundMap.add summary_name lb map
     ) !env_bound_map EnvBoundMap.empty in
 
     List.iter (fun ((f,edge_type,t), local_bounds) ->
-      Printf.printf "%d -> %d (%s): %s\n" f t (Cfg.pprint_edge_type edge_type) (pprint_bound_list local_bounds) ;
+      Printf.printf "%d -> %d (%s):\t%s\n" f t (Cfg.pprint_edge_type edge_type) (pprint_bound local_bounds) ;
     ) edge_bound_map ;
     Printf.printf "\n%!" ;
 
