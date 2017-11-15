@@ -28,17 +28,6 @@ let print_absv man abs_map ca =
     Format.printf "%s %a@." (Ca.pprint_cloc cloc) (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
   ) ca
 
-(* get APRON environment from CA {{{ *)
-
-let get_env cfg =
-  let var_array = Array.of_list (collect_vars cfg) in
-  let vars = Array.map Var.of_string var_array in
-  let env = Environment.make vars [||] in
-  (* Format.printf "env=%a@" (fun x -> Environment.print x) env ; *)
-  env
-
-(* }}} *)
-
 (* sequential (atomic) abstract execution {{{ *)
 
 let seq_absv man env absv_fploc stmts =

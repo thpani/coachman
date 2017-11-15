@@ -479,21 +479,6 @@ let structure_from_parsed_heaps heaps =
     (0, { nodes ; succ ; var }), constr
   ) heaps
 
-let remove_unreachable_vertices initv cfg =
-  let module GChecker = Graph.Path.Check(G) in
-  let unreach_vertices = G.fold_vertex (fun v l ->
-    if not (GChecker.check_path (GChecker.create cfg) initv v) then v :: l else l
-  ) cfg [] in
-  List.iter (fun v -> G.remove_vertex cfg v) unreach_vertices ;
-  List.length unreach_vertices
-
-let remove_summary_edges ?(summary_name=None) g =
-  let pred = match summary_name with
-  | None   -> (function Cfg.S n -> true  | _ -> false)
-  | Some s -> (function Cfg.S n -> n = s | _ -> false)
-  in
-  G.iter_edges_e (fun edge -> let f,(_, summary),t = edge in if pred(summary) then G.remove_edge_e g edge) g
-
 let collect_vars cfg =
   let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
   let max_node = G.fold_vertex (fun (ploc, heap) m ->
