@@ -56,13 +56,13 @@ let get_local_bounds vars ca =
     let var_edge_map = StringSet.fold (fun var map ->
       let edges_ranked_by_var = List.filter (fun edge -> (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
         let _,(dc,_),_ = edge in
-        let decreases_on_edge = (List.assoc var dc) = Strict in
-        let increases_in_scc = List.fold_left (fun b (_,(dc,_),_) -> b || ((List.assoc var dc) = DontKnow)) false scc in
+        let decreases_on_edge = (StringMap.find var dc) = Strict in
+        let increases_in_scc = List.fold_left (fun b (_,(dc,_),_) -> b || ((StringMap.find var dc) = DontKnow)) false scc in
         decreases_on_edge && (not increases_in_scc)
       ) scc in
       StringMap.add var edges_ranked_by_var map
     ) vars StringMap.empty in
-    (* List.iter (fun (var, edges_ranked_by_var) -> *)
+    (* StringMap.iter (fun var edges_ranked_by_var -> *)
     (*   Printf.printf "Variable %s ranks edges:\n" var ; *)
     (*   List.iter (fun edge -> Printf.printf "  %s" (pprint_edge edge)) edges_ranked_by_var *)
     (* ) var_edge_map ; *)
@@ -135,12 +135,13 @@ let hitting_set_approx vars =
   * (1) checking the intersection over all variable sets.
   * (2) greedily picking one variable from each variable set. *)
   let common_vars = match vars with
-    | varset :: tail -> StringSet.elements (List.fold_left StringSet.inter varset vars)
-    | []             -> []
+    | varset :: _ -> List.fold_left StringSet.inter varset vars
+    | []          -> StringSet.empty
   in
-  match common_vars with
-    | [] -> List.map StringSet.min_elt vars
-    | _  -> common_vars
+  if StringSet.is_empty common_vars then
+    List.map pick_summary_counter_if_possible vars
+  else
+    [ pick_summary_counter_if_possible common_vars ]
 
 let fold_bounds ctx env_bound_map bounds =
   let c, unbounded, vars = List.fold_left (fun (const_carry, unbounded_carry, var_carry) bound ->
@@ -188,10 +189,10 @@ let refine_ca_with_env_bounds ca_rel_abstract env_bound_map =
       | Cfg.S s when s = summary_name -> Strict
       | _ -> NonStrict
     end in
-    (summary_ctr summary_name, sca_op) :: result
-  ) env_bound_map [] in
+    StringMap.add (summary_ctr summary_name) sca_op result
+  ) env_bound_map StringMap.empty in
   Ca_rel.Abstract.G.fold_edges_e (fun (from, (dc, edge_type), to_) ca_rel ->
-    let dc' = (env_bound_constr edge_type) @ dc in
+    let dc' = StringMap.union (fun _ refined _ -> Some refined) (env_bound_constr edge_type) dc in
     let edge' = (from, (dc', edge_type), to_) in
     G.add_edge_e ca_rel edge'
   ) ca_rel_abstract G.empty

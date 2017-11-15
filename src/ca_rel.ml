@@ -1,7 +1,8 @@
+open Ca
+open Util
+
 open Graph
 open Z3
-
-open Ca
 
 let mk_numeral ctx n  = Expr.mk_numeral_int ctx n (Arithmetic.Integer.mk_sort ctx)
 let mk_const ctx num_prime id = 
@@ -112,11 +113,11 @@ let pprint_diff_constr = function
   | NonStrict -> "<="
   | DontKnow -> "?"
 let pprint_diff_constr_list l =
-  let l = List.filter (fun (_, c) -> c <> DontKnow) l in
+  let l = StringMap.filter (fun _ c -> c <> DontKnow) l in
   String.concat "\n" (
-  List.map (fun (id, diff_constr) ->
-    Printf.sprintf "%s' %s %s" id (pprint_diff_constr diff_constr) id
-  ) l
+  StringMap.fold (fun id diff_constr l ->
+    (Printf.sprintf "%s' %s %s" id (pprint_diff_constr diff_constr) id) :: l
+  ) l []
 )
 
 (* graph module declarations {{{ *)
@@ -124,9 +125,9 @@ let pprint_diff_constr_list l =
 type summary_id = int
 
 module E_ = struct
-  type t = (identifier * diff_constr) list * Cfg.edge_type
+  type t = diff_constr StringMap.t * Cfg.edge_type
   let compare = compare
-  let default = [], Cfg.effect_id
+  let default = StringMap.empty, Cfg.effect_id
 end
 
 module G = Persistent.Digraph.ConcreteBidirectionalLabeled(Ca.V_)(E_)
@@ -150,7 +151,7 @@ module SCC = Components.Make(G)
 
 (* }}} *)
 
-let abstract ctx vars expr highest_prime = List.map (fun var ->
+let abstract ctx vars expr highest_prime = StringSet.fold (fun var map ->
   let check_diff_constr pred =
     let c = mk_const ctx 0 var in
     let c' = mk_const ctx highest_prime var in
@@ -169,8 +170,8 @@ let abstract ctx vars expr highest_prime = List.map (fun var ->
       else NonStrict
     else DontKnow
   in
-  var, kind
-) vars
+  StringMap.add var kind map
+) vars StringMap.empty
 
 let of_ca ?(do_qe=false) ca =
   let ctx = mk_context [] in
