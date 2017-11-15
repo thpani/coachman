@@ -128,9 +128,19 @@ let get_refined_env_bounds effect_name env_bounds = function
   end
   | _ -> env_bounds (* TODO multiple abstract edges with different ranking functions *)
 
+let pick_summary_counter_if_possible set =
+  (* TODO we prefer summary counters here, because we can bound we know their
+   * invairant by construction. In general, we should select the variable with 
+   * minimal bound here. *)
+  let summary_counters = StringSet.filter is_summary_ctr set in
+  if StringSet.is_empty summary_counters then
+    StringSet.min_elt set
+  else
+    StringSet.min_elt summary_counters
+
 let hitting_set_approx vars =
   (* Select minimal set of variables present in all Var bounds.
-  * The optimal solution for sum-of-vars would be computing the hitting set (NP-complete).
+  * The optimal solution would be computing the hitting set (NP-complete).
   * We approximate this by
   * (1) checking the intersection over all variable sets.
   * (2) greedily picking one variable from each variable set. *)
