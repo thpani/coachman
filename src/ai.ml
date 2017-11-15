@@ -51,8 +51,9 @@ let absv_seq man env absv stmts =
       Tcons1.array_set cons_array 0 cons ; cons_array
     | _ -> raise (Invalid_argument (Printf.sprintf "Unsupported expression %s" (pprint_bexpr b)))
   in
-  List.fold_left (fun absv stmt -> 
-  let absv' = match stmt with
+  (* 1. For each statement in `stmts', apply a constraint / assignment matching
+   * the Assume or Asgn. *)
+  let absv = List.fold_left (fun absv stmt -> match stmt with
     | Assume True ->
         absv
   | Assume b ->
@@ -63,9 +64,20 @@ let absv_seq man env absv stmts =
       let var = Var.of_string id in
       let texpr = nexpr_to_expr env e in
         Abstract1.assign_texpr man absv var texpr None
-  ) absv stmts
+  ) absv stmts in
+  (* 2. Bound each counter from below by 0. *)
+  let vars, _ = Environment.vars env in
+  let array_bounded_by_0 = Lincons1.array_make env (Array.length vars) in
+  Array.iteri (fun i var ->
+    let linexpr = Linexpr1.make env in
+    Linexpr1.set_coeff linexpr var (Coeff.s_of_int 1) ;
+    let lincons = Lincons1.make linexpr Lincons1.SUPEQ in
+    Lincons1.array_set array_bounded_by_0 i lincons
+  ) vars ;
+  Abstract1.meet_lincons_array man absv array_bounded_by_0
 
 (* }}} *)
+
 
 (* abstract interpretation fixpoint computation {{{ *)
 
