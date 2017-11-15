@@ -507,3 +507,20 @@ let collect_vars cfg =
   let vars_edge = G.fold_edges_e (fun (_, (stmts, _), _) l -> (collect_vars_seq stmts) @ l) cfg [] in
   let id_list = List.sort_uniq compare (vars_vertex @ vars_edge) in
   id_list
+
+let scc_edges g = 
+  let scc_list = SCC.scc_list g in
+  List.map (fun scc_vertices ->
+    (* for this SCC... *)
+    List.fold_left (fun l scc_vertex_from ->
+      (* and this vertex, get all edges to successors that are also in the same SCC *)
+      let scc_vertex_from_succs_in_scc = List.fold_left (fun l edge ->
+        let from, _, to_ = edge in
+        let (fploc,_), (tploc,_) = from, to_ in
+        let to_in_same_scc = List.mem to_ scc_vertices in
+        if to_in_same_scc then (fploc, tploc) :: l else l
+      ) [] (G.succ_e g scc_vertex_from)
+      in
+      scc_vertex_from_succs_in_scc @ l
+    ) [] scc_vertices
+  ) scc_list
