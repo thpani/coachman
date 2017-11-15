@@ -220,22 +220,22 @@ let from_ast ast =
                 E d,
                 Atomic [ Assume(Neg(Eq(a, Id b))) ]
             | _ -> Assume guard, effect_id, Assume (Neg guard)
-            in
-            let selse = else_guard :: selse in
-            let last_before_if = !last in
+          in
+          let selse = else_guard :: selse in
+          let last_before_if = !last in
           begin match if_guard with
             | Ast.Atomic s ->
-              let next_v = next_vertex g in
+                let next_v = next_vertex g in
                 GImp.add_edge_e g (!last, (from_ast_stmt s, if_guard_effect), next_v) ; last := next_v
-              | _ -> gen_cfg [if_guard]
-            end ;
+            | _ -> gen_cfg [if_guard] 
+          end ;
           did_goto := false ;
-              gen_cfg sif ;
+          gen_cfg sif ;
           let did_goto_in_if = !did_goto in
           let last_after_if = !last in
-              last := last_before_if ;
+          last := last_before_if ;
           did_goto := false;
-              gen_cfg selse ;
+          gen_cfg selse ;
           let did_goto_in_else = !did_goto in
           let last_after_else = !last in
           if did_goto_in_if && did_goto_in_else then
@@ -274,26 +274,50 @@ let from_ast ast =
     ) ast
   in
   gen_cfg ast ;
-  (* Remove assume(false) edges *)
-  let rec bval = function
-    | True -> Some True
-    | False -> Some False
-    | Neg s -> (match bval s with Some True -> Some False | Some False -> Some True | _ -> None)
-    | _ -> None
+  (* Fold boolean conditions in assumes *)
+  let rec fold_boolean = function
+    | True -> True
+    | False -> False
+    | Neg (Neg s) -> (fold_boolean s)
+    | Neg s -> (match fold_boolean s with True -> False | False -> True | _ -> Neg s)
+    | s -> s
   in
-  GImp.iter_edges_e (fun (from, (stmt, _), to_) -> match stmt with
-    | [ Assume s ] -> (match bval s with
-      | Some False -> GImp.remove_edge g from to_
-      | Some True  -> if from > 0 then
-        let preds = GImp.pred_e g from in
-        GImp.remove_edge g from to_ ;
-        List.iter (fun (pred, s, pred_to) ->
-            GImp.remove_edge g pred pred_to ;
-            GImp.add_edge_e g (pred, s, to_) ;
-        ) preds
-      | _ -> ()
+  GImp.iter_edges_e (fun edge ->
+    match edge with
+    | f, ([Assume s], et), t -> (
+      let simplified_s = fold_boolean s in
+      GImp.remove_edge_e g edge ;
+      if simplified_s <> False then GImp.add_edge_e g (f, ([Assume simplified_s], et), t)
     )
     | _ -> ()
+  ) g ;
+  (* Fold assume(true) edges *)
+  GImp.iter_vertex (fun vertex ->
+    match GImp.succ_e g vertex with
+    | [ _, ([Assume True], et), succ ] -> (
+      (* remove the assume true edge *)
+      GImp.remove_edge_e g (vertex, ([Assume True], et), succ) ;
+
+      (* redirect all predecessor edges to the singleton successor *)
+      GImp.iter_pred_e (fun (pred, e, _) ->
+        GImp.remove_edge_e g (pred, e, vertex) ;
+        GImp.add_edge_e g (pred, e, succ)
+      ) g vertex ;
+
+      (* if vertex = 0, rename the successor to 0 *)
+      if vertex = 0 then begin
+        let vertex_to_rename = succ in
+        GImp.iter_pred_e (fun (pred, e, _) ->
+          GImp.remove_edge_e g (pred, e, vertex_to_rename) ;
+          GImp.add_edge_e g (pred, e, 0)
+        ) g vertex_to_rename ;
+        GImp.iter_succ_e (fun (_, e, succ) ->
+          GImp.remove_edge_e g (vertex_to_rename, e, succ) ;
+          GImp.add_edge_e g (0, e, succ)
+        ) g succ
+      end
+    )
+    | _ -> () (* not a single successor reachable via assume stmt *)
   ) g ;
   (* Remove unreachable vertices *)
   GImp.iter_vertex (fun v ->
