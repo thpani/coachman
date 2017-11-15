@@ -205,7 +205,7 @@ let from_ast ast =
   let last = ref 0 in
   let break_target = ref 0 in
   let continue_target = ref 0 in
-  let did_break = ref false in
+  let did_goto = ref false in
   let g = GImp.create() in
   let max_vertex g = GImp.fold_vertex (fun v a -> max v a) g 0 in
   let next_vertex g = (max_vertex g) + 1 in
@@ -213,46 +213,58 @@ let from_ast ast =
     List.iter (function
       | Ast.IfThenElse (guard, sif, selse) ->
           (* rewrite CAS statements used as conditional *)
-          let if_guard, else_guard = let open Ast in match guard with
-            | Ast.CAS (a,b,c,d) ->
-                let succ_cas = Atomic [ Assume (Eq(a, Id b)) ; Asgn(a, Id c) ] in
-                let fail_cas = Atomic [ Assume(Neg(Eq(a, Id b))) ] in
-                (succ_cas,d), fail_cas
-            | _ -> (Assume guard, ""), Assume (Neg guard)
+          let if_guard, if_guard_effect, else_guard = let open Ast in
+          match guard with
+            | CAS (a,b,c,d) ->
+                Atomic [ Assume (Eq(a, Id b)) ; Asgn(a, Id c) ],
+                E d,
+                Atomic [ Assume(Neg(Eq(a, Id b))) ]
+            | _ -> Assume guard, effect_id, Assume (Neg guard)
             in
             let selse = else_guard :: selse in
             let last_before_if = !last in
-            let last_after_if = ref 0 in
-            begin
+          begin match if_guard with
+            | Ast.Atomic s ->
               let next_v = next_vertex g in
-              let if_guard, summary = if_guard in
-              match if_guard with 
-              | Ast.Atomic s -> GImp.add_edge_e g (!last, (from_ast_stmt s, E summary), next_v) ; last := next_v
+                GImp.add_edge_e g (!last, (from_ast_stmt s, if_guard_effect), next_v) ; last := next_v
               | _ -> gen_cfg [if_guard]
             end ;
+          did_goto := false ;
               gen_cfg sif ;
-              last_after_if := !last ;
+          let did_goto_in_if = !did_goto in
+          let last_after_if = !last in
               last := last_before_if ;
+          did_goto := false;
               gen_cfg selse ;
-              let nv = if !did_break then next_vertex g else !last_after_if in
-              GImp.add_edge_e g (!last, ([Assume True], effect_id), nv) ;
-                did_break := false ;
-                last := nv
+          let did_goto_in_else = !did_goto in
+          let last_after_else = !last in
+          if did_goto_in_if && did_goto_in_else then
+            last := !break_target
+          else begin
+            let next_v = next_vertex g in
+            if not did_goto_in_if then
+              GImp.add_edge_e g (last_after_if, ([Assume True], effect_id), next_v) ;
+            if not did_goto_in_else then
+              GImp.add_edge_e g (last_after_else, ([Assume True], effect_id), next_v) ;
+            last := next_v
+          end
       | Ast.While(guard, stmts) ->
           let loop_head = !last in
           let loop_exit = next_vertex g in
           let stmts = Ast.Assume(guard) :: stmts in
           break_target := loop_exit ;
-          continue_target := loop_exit ;
+          continue_target := loop_head ;
           GImp.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], effect_id), loop_exit) ;
           gen_cfg stmts ;
           GImp.add_edge_e g (!last, ([Assume True], effect_id), loop_head) ;
           last := max_vertex g
       | Ast.Break ->
+          Debugger.logf Debugger.Info "cfg" "Breaking to %d\n" !break_target ;
           GImp.add_edge_e g (!last, ([Assume True], effect_id), !break_target) ;
-          did_break := true
+          did_goto := true
       | Ast.Continue ->
           GImp.add_edge_e g (!last, ([Assume True], effect_id), !continue_target) ;
+          did_goto := true
       | Ast.Atomic stmt ->
         let next_v = next_vertex g in
         GImp.add_edge_e g (!last, (from_ast_stmt stmt, effect_id), next_v) ; last := next_v
