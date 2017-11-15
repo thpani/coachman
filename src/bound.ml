@@ -111,9 +111,9 @@ let get_local_bounds vars ca =
   ) ca []
 
 let summary_ctr summary_name = Printf.sprintf "summary_ctr_%s" summary_name
+let is_summary_ctr id = Str.string_match (Str.regexp "^summary_ctr_\\(.*\\)") id 0
 let get_summary_of_summary_ctr id =
-  if Str.string_match (Str.regexp "^summary_ctr_\\(.*\\)") id 0 then
-    Some (Str.matched_group 1 id)
+  if is_summary_ctr id then Some (Str.matched_group 1 id)
   else None
 
 let pprint_env_bound_map map = String.concat "; " (List.map (fun (summary_name, bound) ->
