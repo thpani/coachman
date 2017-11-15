@@ -15,7 +15,7 @@ let lvl_of_string = function
   | "info" -> Info
   | _ -> raise (Invalid_argument "Invalid log level")
 
-let current_level = ref Info
+let current_level = ref Warn
 let current_components : string list ref = ref []
 
 let logf lvl component =
