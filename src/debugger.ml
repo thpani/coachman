@@ -15,9 +15,11 @@ let lvl_of_string = function
   | "info" -> Info
   | _ -> raise (Invalid_argument "Invalid log level")
 
-let current_level = ref Warn
+let current_level = ref Info
+let current_components : string list ref = ref []
 
 let logf lvl component =
-  if component = "bound" then
-    if ord lvl >= ord !current_level then printf else ifprintf stdout
-  else ifprintf stdout
+  if List.mem component !current_components && ord lvl >= ord !current_level then (
+    printf "[%s] " (string_of_lvl !current_level) ;
+    printf
+  ) else ifprintf stdout

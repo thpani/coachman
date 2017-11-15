@@ -7,8 +7,8 @@ let position_string lexbuf =
   Printf.sprintf "%d:%d" pos.Lexing.pos_lnum (pos.Lexing.pos_cnum - pos.Lexing.pos_bol + 1)
 
 let set_debug_level () = match Sys.getenv_opt "DEBUG" with
-  | Some lvl -> Debugger.current_level := (Debugger.lvl_of_string lvl)
-  | None     -> ()
+  | Some s -> Debugger.current_components := (String.split_on_char ',' s)
+  | None   -> ()
 
 let parse_input () =
   let parse path p l =
