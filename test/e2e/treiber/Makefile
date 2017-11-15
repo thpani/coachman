@@ -1,0 +1,14 @@
+.PHONY: all emp pop push
+
+BIN = ../../../main.native
+
+all: emp pop push
+
+emp:
+	$(BIN) treiber.tiny treiber.heap ../empty.summaries
+
+pop:
+	$(BIN) treiber_pop.tiny treiber.heap treiber.summaries
+
+push:
+	$(BIN) treiber_push.tiny treiber.heap treiber.summaries
