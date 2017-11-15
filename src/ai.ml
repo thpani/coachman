@@ -51,16 +51,18 @@ let seq_absv man env absv_fploc stmts =
       Tcons1.array_set cons_array 0 cons ; cons_array
     | _ -> raise (Invalid_argument (Printf.sprintf "Unsupported expression %s" (pprint_bexpr b)))
   in
-  List.fold_left (fun absv_fploc stmt -> match stmt with
+  List.fold_left (fun absv stmt -> 
+  let absv' = match stmt with
+    | Assume True ->
+        absv
   | Assume b ->
       let tcons = bexpr_to_tcons_array env b in
       let cons_absv = Abstract1.of_tcons_array man env tcons in
-      let absv = Abstract1.meet man absv_fploc cons_absv in
-      absv
+        Abstract1.meet man absv cons_absv
   | Asgn (id, e) -> 
       let var = Var.of_string id in
       let texpr = nexpr_to_expr env e in
-      let absv = Abstract1.assign_texpr man absv_fploc var texpr None in
+        Abstract1.assign_texpr man absv var texpr None
       absv
   ) absv_fploc stmts
 
