@@ -78,16 +78,12 @@ let do_abstract_computation man env abs_map cfg =
     while not (abs_map_equal man !abs_map !prev_abs_map) do
       prev_abs_map := !abs_map ;
       abs_map := G.fold_vertex (fun vertex map ->
-        let ploc, _ = vertex in
-        if ploc = 0 || (List.length (G.pred cfg vertex)) = 0 then
-          map
-        else begin
           let incoming_absv = G.fold_pred_e (fun (fvertex, (stmts, _), _) l ->
             let absv_fploc = AbsMap.find fvertex !abs_map in
-            (seq_absv man env absv_fploc stmts) :: l
-          ) cfg vertex []
-          in
-          let absv = Abstract1.join_array man (Array.of_list incoming_absv) in
+          (absv_seq man env absv_fploc stmts) :: l
+        ) cfg vertex [] in
+        let absv_list = (AbsMap.find vertex !abs_map) :: incoming_absv in
+        let absv = Abstract1.join_array man (Array.of_list absv_list) in
           let widened_itvl_array = Array.map (fun var ->
             let itvl = Abstract1.bound_variable man absv var in
             let testitvl = Interval.of_int 1 3 in
@@ -96,7 +92,6 @@ let do_abstract_computation man env abs_map cfg =
           in
           let widened_absv = Abstract1.of_box man env vars widened_itvl_array in
           AbsMap.add vertex widened_absv map
-        end
       ) cfg !abs_map
     done ;
     (* AbsMap.iter (fun cloc absv -> *)
@@ -120,15 +115,13 @@ let do_abstract_computation_initial_values init_clocs vars cfg =
     | Some i -> i
     | None -> Interval.top
   ) vars in
-  let abs_map = G.fold_vertex (fun cloc map ->
-    let abs_val = match cloc with
-      | 0, _ ->
-        let init_heap = List.find_opt (fun (init_cloc, _) -> cloc_equal cloc init_cloc) init_clocs in
-        let constr = match init_heap with Some (_, c) -> c | None -> [] in
-        Abstract1.of_box man env vars (init_interval constr)
-      | _ -> Abstract1.bottom man env
+  let abs_map = G.fold_vertex (fun current_cloc map ->
+    let init_heap = List.find_opt (fun (init_cloc, _) -> cloc_equal current_cloc init_cloc) init_clocs in
+    let absv = match init_heap with (* check if cloc is an initial vertex *)
+    | Some (_, itvl) -> Abstract1.of_box man env vars (init_interval itvl)
+    | None -> Abstract1.bottom man env
     in
-    AbsMap.add cloc abs_val map
+    AbsMap.add current_cloc absv map
   ) cfg AbsMap.empty
   in
   do_abstract_computation man env abs_map cfg
