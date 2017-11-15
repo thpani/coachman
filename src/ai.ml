@@ -78,6 +78,130 @@ let absv_seq man env absv stmts =
 
 (* }}} *)
 
+(* Relational abstract execution {{{ *)
+let linexpr_of_z3 env ctx expr =
+  let open Z3 in
+  let params = Params.mk_params ctx in
+  Params.add_bool params (Symbol.mk_string ctx "arith_lhs") true ;
+  Params.add_bool params (Symbol.mk_string ctx "som") true ;
+  let expr = Expr.simplify expr (Some params) in
+  let const, vars =
+    if Expr.is_const expr then
+      let rhs_var = Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl expr)) in
+      0, [ 1, rhs_var ]
+    else if Expr.is_numeral expr then
+      let rhs_num = Arithmetic.Integer.get_int expr in
+      rhs_num, []
+    else begin
+      if not (Arithmetic.is_add expr) then raise (Invalid_argument (Printf.sprintf "Expecting expr of equality to be addition: %s" (Expr.to_string expr))) ;
+      let add_args = Expr.get_args expr in
+      let const, vars = List.fold_left (fun (const, vars) arg ->
+        if Expr.is_const arg then
+          const, ( 1, Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl arg)) ) :: vars
+        else if Expr.is_numeral arg then
+          const + (Arithmetic.Integer.get_int arg), vars
+        else begin
+          if not (Arithmetic.is_mul arg) then raise (Invalid_argument (Printf.sprintf "Expecting addends to be multiplications: %s" (Expr.to_string arg))) ;
+          if not ((Expr.get_num_args arg) = 2) then raise (Invalid_argument (Printf.sprintf "Expecting addends to be linear: %s" (Expr.to_string arg))) ;
+          match Expr.get_args arg with
+          | [ c ; arg ] -> const, ( Arithmetic.Integer.get_int c, Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl arg)) ) :: vars
+          | _ -> assert false
+        end
+      ) (0, []) add_args in
+      const, vars
+    end
+  in
+  let const = Coeff.s_of_int const in
+  let vars = List.map (fun (c, v) -> Coeff.s_of_int c, Var.of_string v) vars in
+  let linexpr = Linexpr1.make env in
+  Linexpr1.set_list linexpr vars (Some const) ; linexpr
+
+let get_primed_var expr = let open Z3 in
+  if Expr.is_const expr then
+    let symbol = Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl expr)) in
+    let symbol_len = String.length symbol in
+    let is_primed = symbol.[symbol_len-1] = '\'' in
+    if is_primed then
+      let unprimed_symbol = String.sub symbol 0 (symbol_len-1) in
+      Some (symbol, unprimed_symbol)
+    else None
+  else None
+
+let absv_rel man env absv (expr, highest_prime) =
+  let open Z3 in
+  Printf.printf "%s\n" (Expr.to_string expr) ;
+  if highest_prime > 1 then invalid_arg "Abstract execution is only implemented for (singly) primed constraints" ;
+  let expr = Expr.simplify expr None in
+  if not (Boolean.is_and expr) then invalid_arg "Expecting a top-level conjunction" ;
+  let constraints = Expr.get_args expr in
+  let updates, update_refs, assumptions = List.fold_left (fun (acc_updates, acc_update_refs, acc_assumptions) inequality ->
+    (* inequality has either the form 
+     * 1. (= x' y')
+     * 2. (= x' (lin_expr))
+     * 3. (op x lin_expr)
+     * which will be accumulated in 1. acc_updates, 2. acc_update_refs, 3. acc_assumptions. *)
+    let neg = Boolean.is_not inequality in
+    let inner = if neg then List.hd (Expr.get_args inequality) else inequality in
+    let args = Expr.get_args inner in
+    let lhs = List.nth args 0 in
+    if not (Expr.is_const lhs) then invalid_arg (Printf.sprintf "Expecting LHS of inequality to be const: %s" (Expr.to_string inequality)) ;
+    let ctx = mk_context [] in
+    match get_primed_var lhs with
+    | Some (lhs_symbol, lhs_unprimed_symbol) -> (
+      if not (Boolean.is_eq inequality) then invalid_arg (Printf.sprintf "Expecting update constraint to be equality: %s" (Expr.to_string inequality)) ;
+      let rhs = List.nth args 1 in
+      match get_primed_var rhs with
+      | Some (_,rhs_unprimed_symbol) ->
+          acc_updates, (lhs_unprimed_symbol, rhs_unprimed_symbol) :: acc_update_refs, acc_assumptions
+      | None ->
+          let linexpr = linexpr_of_z3 env ctx rhs in
+          (lhs_unprimed_symbol, linexpr) :: acc_updates, acc_update_refs, acc_assumptions
+    )
+    | None -> (
+      let params = Params.mk_params ctx in
+      Params.add_bool params (Symbol.mk_string ctx "arith_lhs") true ;
+      Params.add_bool params (Symbol.mk_string ctx "som") true ;
+      let inequality = Expr.simplify inequality (Some params) in
+      let neg = Boolean.is_not inequality in
+      let inner = if neg then List.hd (Expr.get_args inequality) else inequality in
+      let comparison =
+        if (not neg) && Boolean.is_eq inner then Lincons1.EQ
+        else if Arithmetic.is_le inner then Lincons1.SUP
+        else if ((not neg) && (Arithmetic.is_ge inner)) then Lincons1.SUPEQ
+        else invalid_arg (Printf.sprintf "Expecting inequality in normal form: %s" (Expr.to_string inequality)) (* should not happen after Z3 simplification *)
+      in
+      let args = Expr.get_args inner in
+      let lhs = List.nth args 0 in
+      let linexpr = linexpr_of_z3 env ctx lhs in
+      assert (Coeff.equal_int (Linexpr1.get_cst linexpr) 0) ;
+      let rhs = List.nth args 1 in
+      let cst = Arithmetic.Integer.get_int rhs in
+      Linexpr1.set_cst linexpr (Coeff.s_of_int (-cst)) ;
+      if neg && (comparison = Lincons1.SUP) then ((* flip coefficients *)
+        let vars, _ = Environment.vars env in
+        Array.iter (fun var -> Linexpr1.set_coeff linexpr var (Coeff.neg (Linexpr1.get_coeff linexpr var))) vars
+      ) ;
+      let cons = Lincons1.make linexpr comparison in
+      let cons_array = Lincons1.array_make env 1 in
+      Lincons1.array_set cons_array 0 cons ;
+      acc_updates, acc_update_refs, cons_array :: acc_assumptions
+    )
+  ) ([], [], []) constraints in
+  let absv = List.fold_left (fun acc_absv assumption -> 
+    Abstract1.meet_lincons_array man acc_absv assumption
+  ) absv assumptions in
+  let absv = List.fold_left (fun acc_absv (var_name, linexpr) ->
+    let var = Var.of_string var_name in
+    Abstract1.assign_linexpr man acc_absv var linexpr None
+  ) absv updates in
+  let absv = List.fold_left (fun acc_absv (var_name, update_ref) ->
+    let var = Var.of_string var_name in
+    let linexpr = List.assoc update_ref updates in
+    Abstract1.assign_linexpr man acc_absv var linexpr None
+  ) absv update_refs in
+  absv
+
+(* }}} *)
 
 (* abstract interpretation fixpoint computation {{{ *)
 
