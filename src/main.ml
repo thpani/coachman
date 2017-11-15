@@ -35,17 +35,26 @@ let parse_input () =
   let summaries = parse_program fn_summary in
   init_heaps, functions, summaries
 
+let pprint_summaries summaries = String.concat ", " (List.map fst summaries)
+
 let process_function init_heaps summaries (fun_name, ast) = 
-  print_endline fun_name ;
-  let fn_prog_basename = Filename.basename fn_prog in
-  let cfg_dot = Printf.sprintf "%s.%s.dot" fn_prog_basename fun_name in
-  let ca_dot = Printf.sprintf "%s.%s.bi.dot" fn_prog_basename fun_name in
+  Printf.printf "%s || summaries %s\n" fun_name (pprint_summaries summaries) ;
+  let fn_prog_basename = Filename.remove_extension (Filename.basename fn_prog) in
+  let dot_basename = Printf.sprintf "%s.%s" fn_prog_basename fun_name in
 
   let cfg = Cfg.from_ast ast in
   let cfg_with_summaries = Cfg.add_summaries cfg summaries in
 
-  let ca = Ca.from_cfg init_heaps cfg in
-  Ca.Dot.write_dot ca ca_dot ;
+  let get_color (_,(_,edge_type),_) = match edge_type with
+    | Cfg.S name -> Colormap.get_color (Util.List.find name (List.map fst summaries))
+    | _ -> 0x000000
+  in
+  let module CfgDot = Cfg.Dot(struct
+    let get_color = get_color
+    let get_label (_,(stmts,_),_) = Cfg.pprint_seq stmts
+  end) in
+  CfgDot.write_dot cfg dot_basename "cfg" ;
+  CfgDot.write_dot cfg_with_summaries dot_basename "cfg_summaries" ;
 
   Bound.compute_bounds cfg ca
 

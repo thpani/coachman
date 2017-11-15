@@ -25,8 +25,8 @@ type summary_id = int
 
 type edge_type = E of string | S of string
 let pprint_edge_type = function
-  | E name -> Printf.sprintf "Effect %s" name
-  | S name -> Printf.sprintf "Summary %s" name
+  | E name -> Printf.sprintf "effect %s" name
+  | S name -> Printf.sprintf "summary %s" name
 let effect_id = E "ID"
 
 (* }}} *)
@@ -117,20 +117,31 @@ module GChecker = Path.Check(GImp)
 module G = Persistent.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
 module SCC = Components.Make(G)
 
-module Dot_ = Graphviz.Dot (struct
-  include G
-  let vertex_name v = "\"" ^ (string_of_int v) ^  "\""
-  let graph_attributes _ = []
-  let default_vertex_attributes _ = []
-  let vertex_attributes _ = []
-  let default_edge_attributes _ = []
-  let edge_attributes (v1, (stmt, summary), v2) = [ `Label (pprint_seq stmt) ]
-  let get_subgraph _ = None
-end)
+module type Edgeable = sig
+  val get_color : G.edge -> int
+  val get_label : G.edge -> string
+end
 
-module Dot = struct
-  include Dot_
-  let write_dot g path = let chout = open_out path in Dot_.output_graph chout g ; close_out chout
+module Dot (X:Edgeable) = struct
+  include Graphviz.Dot (struct
+    include G
+    let graph_attributes _ = []
+    let default_vertex_attributes _ = []
+    let vertex_name v = "\"" ^ (string_of_int v) ^  "\""
+    let vertex_attributes _ = []
+    let get_subgraph _ = None
+    let default_edge_attributes _ = []
+    let edge_attributes edge = [
+      `Label (X.get_label edge) ;
+      `Color (X.get_color edge) ;
+      `Fontcolor (X.get_color edge)
+    ]
+  end)
+
+  let write_dot g dot_basename component =
+    let path = Printf.sprintf "%s.%s.dot" dot_basename component in
+    let chout = open_out path in
+    output_graph chout g ; close_out chout
 end
 
 
