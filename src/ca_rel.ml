@@ -14,11 +14,11 @@ let identity_rel ctx num_prime vars =
   let constr  = List.map2 (Boolean.mk_eq ctx) consts' consts in
   constr
 
-let rec torel_bexpr ctx num_prime = let open Arithmetic in function
+let rec torel_bexpr ctx num_prime = function
   | True  -> Boolean.mk_true ctx
   | False -> Boolean.mk_false ctx
   | Eq (id, n) -> Boolean.mk_eq ctx (mk_const ctx num_prime id) (mk_numeral ctx n)
-  | Gt (id, n) -> mk_gt ctx (mk_const ctx num_prime id) (mk_numeral ctx n)
+  | Gt (id, n) -> Arithmetic.mk_gt ctx (mk_const ctx num_prime id) (mk_numeral ctx n)
   | Neg b -> Boolean.mk_not ctx (torel_bexpr ctx num_prime b)
 
 let rec torel_nexpr ctx num_prime = function
