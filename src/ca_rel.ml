@@ -173,13 +173,11 @@ let abstract ctx vars expr highest_prime = StringSet.fold (fun var map ->
   StringMap.add var kind map
 ) vars StringMap.empty
 
-let of_ca ?(do_qe=false) ca =
-  let ctx = mk_context [] in
-  let vars = collect_vars ca in
-  let ca_rel = Concrete.of_ca ctx ~do_qe ca in
-  Concrete.G.fold_edges_e (fun (from, ((expr, highest_prime), summary), to_) ca_rel ->
+let of_concrete ctx vars ca_rel =
+  let ca_rel_abstract = Concrete.G.fold_edges_e (fun (from, ((expr, highest_prime), summary), to_) ca_rel ->
     let diff_constr = abstract ctx vars expr highest_prime in
     G.add_edge_e ca_rel (from, (diff_constr, summary), to_)
-  ) ca_rel G.empty
+  ) ca_rel G.empty in
+  ca_rel_abstract
 
 end

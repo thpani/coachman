@@ -42,7 +42,7 @@ let process_function init_heaps summaries (fun_name, ast) =
   let fn_prog_basename = Filename.remove_extension (Filename.basename fn_prog) in
   let dot_basename = Printf.sprintf "%s.%s" fn_prog_basename fun_name in
 
-  let cfg = Cfg.from_ast ast in
+  let cfg                = Cfg.from_ast ast in
   let cfg_with_summaries = Cfg.add_summaries cfg summaries in
 
   let get_color (_,(_,edge_type),_) = match edge_type with
@@ -56,7 +56,7 @@ let process_function init_heaps summaries (fun_name, ast) =
   CfgDot.write_dot cfg dot_basename "cfg" ;
   CfgDot.write_dot cfg_with_summaries dot_basename "cfg_summaries" ;
 
-  Bound.compute_bounds cfg ca
+  Bound.compute_bounds dot_basename get_color init_heaps cfg_with_summaries
 
 let main () =
   let init_heaps, functions, summaries = parse_input () in
