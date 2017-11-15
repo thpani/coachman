@@ -48,9 +48,10 @@ module Concrete = struct
 (* graph module declarations {{{ *)
 
 type summary_id = int
+type highest_prime = int
 
 module E_ = struct
-  type t = (Expr.expr * int) * Cfg.edge_type
+  type t = (Expr.expr * highest_prime) * Cfg.edge_type
   let compare ((e1,_), s1) ((e2,_), s2) = let compe = Expr.compare e1 e2 in
     match compe with 0 -> compare s1 s2 | _ -> compe
   let default = (Boolean.mk_true (mk_context []), 0), Cfg.effect_id
