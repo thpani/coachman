@@ -107,9 +107,11 @@ let do_abstract_computation man env abs_map cfg =
   end
   with Manager.Error e -> Printf.eprintf "ERROR: %s; %s\n" e.Apron.Manager.msg (Manager.string_of_funid e.Apron.Manager.funid) ; raise (Manager.Error e)
 
-let do_abstract_computation_initial_values init_clocs cfg =
+let do_abstract_computation_initial_values init_clocs vars cfg =
   let man = Box.manager_alloc () in
-  let env = get_env cfg in
+  let var_array = Array.of_list vars in
+  let vars = Array.map Var.of_string var_array in
+  let env = Environment.make vars [||] in
   let vars, _ = Environment.vars env in
   let init_interval constr = Array.map (fun v ->
     let var_name = Var.to_string v in
