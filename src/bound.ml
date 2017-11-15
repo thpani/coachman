@@ -196,7 +196,9 @@ let refine_ca_with_env_bounds ca_rel_abstract env_bound_map =
     G.add_edge_e ca_rel edge'
   ) ca_rel_abstract G.empty
 
-let compute_bounds cfg ca =
+let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
+  let cfg = Cfg.precompile cfg_not_precompiled in
+
   let summaries, effects = Cfg.G.fold_edges_e (fun (_,(_,summary_ref),_) (summaries, effects) ->
     match summary_ref with
     | Cfg.S name -> StringSet.add name summaries,                    effects

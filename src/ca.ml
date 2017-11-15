@@ -117,7 +117,10 @@ module E_ = struct
   let default = [ Assume True ], Cfg.effect_id
 end
 
-module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
+module GImp = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
+module G = Persistent.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
+module GChecker = Path.Check(G)
+module SCC = Components.Make(G)
 
 module Dot_ = Graphviz.Dot (struct
   include G
@@ -395,7 +398,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
    * *in* the CA to retain semantic equivalence. We still stop exploring the
    * path *after* the `assume(false)'.
    *)
-  let g = G.create () in
+  let g = GImp.create () in
   let q = Queue.create () in
   let indent = String.make indent ' ' in
   let rename_max_node g stmt to_vertex =
@@ -422,7 +425,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
   in
   (* add inital vertex to graph and worklist *)
   List.iter (fun (init_cloc, _) ->
-    G.add_vertex g init_cloc ;
+    GImp.add_vertex g init_cloc ;
     Queue.add init_cloc q
   ) init_clocs ;
   (* while there are nodes in the worklist *)
@@ -448,14 +451,15 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
               Debugger.logf Debugger.Info "ca_construction" "\n" ;
               tstmt, to_heap, (to_, to_heap)
           in
-          let has_to_vertex = G.mem_vertex g to_vertex in
-          G.add_edge_e g (from_vertex, (tstmt, summary), to_vertex) ;
+          let has_to_vertex = GImp.mem_vertex g to_vertex in
+          GImp.add_edge_e g (from_vertex, (tstmt, summary), to_vertex) ;
           if not has_assume_false && not has_to_vertex && not (cloc_equal to_vertex error_sink) then Queue.add to_vertex q
         end
       ) translated
       end
     ) cfg from
-  done ; g
+  done ;
+  GImp.fold_edges_e (fun edge acc_g -> G.add_edge_e acc_g edge) g G.empty
 
 (* }}} *)
 

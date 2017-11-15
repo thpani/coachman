@@ -111,8 +111,10 @@ module E_ = struct
   let default = [ Assume True ], E "Id"
 end
 
-module G = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
-module GChecker = Path.Check(G)
+module GImp = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
+module GChecker = Path.Check(GImp)
+
+module G = Persistent.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
 module SCC = Components.Make(G)
 
 module Dot_ = Graphviz.Dot (struct
@@ -180,11 +182,9 @@ and precompile_stmt =
   | Asgn (Next _, Next _)      -> raise (Invalid_argument "assignment of .next := .next not implemented")
 
 let precompile cfg =
-  G.iter_edges_e (fun edge ->
-    let from, (stmt, summary), to_ = edge in
-    G.remove_edge_e cfg edge ;
-    G.add_edge_e cfg (from, (precompile_seq stmt, summary), to_)
-  ) cfg
+  G.fold_edges_e (fun (from, (stmt, summary), to_) acc_g ->
+    G.add_edge_e acc_g (from, (precompile_seq stmt, summary), to_)
+  ) cfg G.empty
 
 (* }}} *)
 
@@ -195,8 +195,8 @@ let from_ast ast =
   let break_target = ref 0 in
   let continue_target = ref 0 in
   let did_break = ref false in
-  let g = G.create() in
-  let max_vertex g = G.fold_vertex (fun v a -> max v a) g 0 in
+  let g = GImp.create() in
+  let max_vertex g = GImp.fold_vertex (fun v a -> max v a) g 0 in
   let next_vertex g = (max_vertex g) + 1 in
   let rec gen_cfg ast =
     List.iter (function
@@ -216,7 +216,7 @@ let from_ast ast =
               let next_v = next_vertex g in
               let if_guard, summary = if_guard in
               match if_guard with 
-              | Ast.Atomic s -> G.add_edge_e g (!last, (from_ast_stmt s, E summary), next_v) ; last := next_v
+              | Ast.Atomic s -> GImp.add_edge_e g (!last, (from_ast_stmt s, E summary), next_v) ; last := next_v
               | _ -> gen_cfg [if_guard]
             end ;
               gen_cfg sif ;
@@ -224,7 +224,7 @@ let from_ast ast =
               last := last_before_if ;
               gen_cfg selse ;
               let nv = if !did_break then next_vertex g else !last_after_if in
-              G.add_edge_e g (!last, ([Assume True], effect_id), nv) ;
+              GImp.add_edge_e g (!last, ([Assume True], effect_id), nv) ;
                 did_break := false ;
                 last := nv
       | Ast.While(guard, stmts) ->
@@ -233,21 +233,21 @@ let from_ast ast =
           let stmts = Ast.Assume(guard) :: stmts in
           break_target := loop_exit ;
           continue_target := loop_exit ;
-          G.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], effect_id), loop_exit) ;
+          GImp.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], effect_id), loop_exit) ;
           gen_cfg stmts ;
-          G.add_edge_e g (!last, ([Assume True], effect_id), loop_head) ;
+          GImp.add_edge_e g (!last, ([Assume True], effect_id), loop_head) ;
           last := max_vertex g
       | Ast.Break ->
-          G.add_edge_e g (!last, ([Assume True], effect_id), !break_target) ;
+          GImp.add_edge_e g (!last, ([Assume True], effect_id), !break_target) ;
           did_break := true
       | Ast.Continue ->
-          G.add_edge_e g (!last, ([Assume True], effect_id), !continue_target) ;
+          GImp.add_edge_e g (!last, ([Assume True], effect_id), !continue_target) ;
       | Ast.Atomic stmt ->
         let next_v = next_vertex g in
-        G.add_edge_e g (!last, (from_ast_stmt stmt, effect_id), next_v) ; last := next_v
+        GImp.add_edge_e g (!last, (from_ast_stmt stmt, effect_id), next_v) ; last := next_v
       | stmt ->
         let next_v = next_vertex g in
-        G.add_edge_e g (!last, (from_ast_stmt [stmt], effect_id), next_v) ; last := next_v
+        GImp.add_edge_e g (!last, (from_ast_stmt [stmt], effect_id), next_v) ; last := next_v
     ) ast
   in
   gen_cfg ast ;
@@ -258,34 +258,36 @@ let from_ast ast =
     | Neg s -> (match bval s with Some True -> Some False | Some False -> Some True | _ -> None)
     | _ -> None
   in
-  G.iter_edges_e (fun (from, (stmt, _), to_) -> match stmt with
+  GImp.iter_edges_e (fun (from, (stmt, _), to_) -> match stmt with
     | [ Assume s ] -> (match bval s with
-      | Some False -> G.remove_edge g from to_
+      | Some False -> GImp.remove_edge g from to_
       | Some True  -> if from > 0 then
-        let preds = G.pred_e g from in
-        G.remove_edge g from to_ ;
+        let preds = GImp.pred_e g from in
+        GImp.remove_edge g from to_ ;
         List.iter (fun (pred, s, pred_to) ->
-            G.remove_edge g pred pred_to ;
-            G.add_edge_e g (pred, s, to_) ;
+            GImp.remove_edge g pred pred_to ;
+            GImp.add_edge_e g (pred, s, to_) ;
         ) preds
       | _ -> ()
     )
     | _ -> ()
   ) g ;
   (* Remove unreachable vertices *)
-  G.iter_vertex (fun v ->
-    if not (GChecker.check_path (GChecker.create g) 0 v) then G.remove_vertex g v
+  GImp.iter_vertex (fun v ->
+    if not (GChecker.check_path (GChecker.create g) 0 v) then GImp.remove_vertex g v
   ) g ;
-  g
+  GImp.fold_edges_e (fun edge acc_g -> G.add_edge_e acc_g edge) g G.empty
 
 (* }}} *)
 
 let add_summaries cfg summaries =
-  List.iter (fun (summary_name, stmts) ->
+  List.fold_left (fun cfg (summary_name, stmts) ->
     let summary_seq = Ast.unwrap_atomic stmts in
     let summary_nested_list = from_ast_stmt summary_seq in
-    G.iter_vertex (fun v -> G.add_edge_e cfg (v, (summary_nested_list, S summary_name), v)) cfg
-  ) summaries
+    G.fold_vertex (fun v cfg ->
+      G.add_edge_e cfg (v, (summary_nested_list, S summary_name), v)
+    ) cfg cfg
+  ) cfg summaries
 
 let scc_edges g = 
   let scc_list = SCC.scc_list g in

@@ -42,9 +42,7 @@ let process_function init_heaps summaries (fun_name, ast) =
   let ca_dot = Printf.sprintf "%s.%s.bi.dot" fn_prog_basename fun_name in
 
   let cfg = Cfg.from_ast ast in
-  Cfg.add_summaries cfg summaries ;
-  Cfg.precompile cfg ;
-  Cfg.Dot.write_dot cfg cfg_dot ;
+  let cfg_with_summaries = Cfg.add_summaries cfg summaries in
 
   let ca = Ca.from_cfg init_heaps cfg in
   Ca.Dot.write_dot ca ca_dot ;
