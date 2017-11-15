@@ -61,7 +61,7 @@ statement:
   | WHILE bexpr DO seq_stmt OD                { While ($2, $4) }
   | ID ASGN NEW SEMI                          { Alloc (Id $1) }
   | ID ASGN pexpr_null SEMI                   { Asgn (Id $1, $3) }
-  | ID NEXT ASGN pexpr_null SEMI                { Asgn (Next $1, $4) }
+  | ID NEXT ASGN pexpr_null SEMI              { Asgn (Next $1, $4) }
   | CAS LPAREN pexpr COMMA ID COMMA ID COMMA ID RPAREN SEMI { IfThenElse(CAS($3, $5, $7, $9), [], []) }
   ;
 
