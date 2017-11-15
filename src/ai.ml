@@ -47,8 +47,8 @@ let seq_absv man env absv_fploc stmts =
       | _ -> raise (Invalid_argument (Printf.sprintf "Unsupported expression %s" (pprint_bexpr b)))
       in
       let cons = Tcons1.make expr_id_minus_num typ in
-      let cons_array = Tcons1.array_make env (Environment.size env) in
-      Tcons1.array_set cons_array (Environment.dim_of_var env var) cons ; cons_array
+      let cons_array = Tcons1.array_make env 1 in
+      Tcons1.array_set cons_array 0 cons ; cons_array
     | _ -> raise (Invalid_argument (Printf.sprintf "Unsupported expression %s" (pprint_bexpr b)))
   in
   List.fold_left (fun absv_fploc stmt -> match stmt with
