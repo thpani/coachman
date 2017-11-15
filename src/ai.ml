@@ -129,11 +129,12 @@ let do_abstract_computation_initial_values init_clocs vars cfg =
 (* }}} *)
 
 let remove_infeasible man env abs_map cfg =
-  let infeasible_edges = G.fold_edges_e (fun e l ->
+  G.fold_edges_e (fun e (acc_g,acc_removed) ->
     let fvertex, (stmts, _), _ = e in
-    let absv_fploc = AbsMap.find fvertex abs_map in
-    let seq_absv = seq_absv man env absv_fploc stmts in
-    if Abstract1.is_bottom man seq_absv then e :: l else l
-  ) cfg [] in
-  List.iter (fun e -> G.remove_edge_e cfg e) infeasible_edges ;
-  List.length infeasible_edges
+    let absv  = AbsMap.find fvertex abs_map in
+    let absv' = absv_seq man env absv stmts in
+    if Abstract1.is_bottom man absv' then
+      acc_g, acc_removed+1
+    else
+      G.add_edge_e acc_g e, acc_removed
+  ) cfg (G.empty, 0)
