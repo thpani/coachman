@@ -30,7 +30,7 @@ let print_absv man abs_map ca =
 
 (* sequential (atomic) abstract execution {{{ *)
 
-let seq_absv man env absv_fploc stmts =
+let absv_seq man env absv stmts =
   let rec nexpr_to_expr env e = match e with
     | Id id       -> Texpr1.var env (Var.of_string id)
     | Num num     -> Texpr1.cst env (Coeff.s_of_int num)
@@ -63,8 +63,7 @@ let seq_absv man env absv_fploc stmts =
       let var = Var.of_string id in
       let texpr = nexpr_to_expr env e in
         Abstract1.assign_texpr man absv var texpr None
-      absv
-  ) absv_fploc stmts
+  ) absv stmts
 
 (* }}} *)
 
