@@ -1,0 +1,12 @@
+def pop begin
+  while true do
+    top := ToS;
+    if top = null then
+      break;
+    fi
+    node := top.next;
+    if CAS(ToS, top, node, pop) then
+      break;
+    fi
+  od
+end

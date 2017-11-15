@@ -40,10 +40,10 @@ testt_emp: native
 	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/empty.summaries
 
 testt_pop: native
-	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber_pop.summaries
+	./main.native test/e2e/treiber.pop.tiny test/e2e/treiber.heap test/e2e/treiber.summaries
 
 testt_push: native
-	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber_push.summaries
+	./main.native test/e2e/treiber.push.tiny test/e2e/treiber.heap test/e2e/treiber.summaries
 
 testt_push_pop: native
 	./main.native test/e2e/treiber.tiny test/e2e/treiber.heap test/e2e/treiber.summaries
