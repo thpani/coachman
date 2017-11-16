@@ -264,6 +264,12 @@ let refine_ca_rel_abstract_with_env_bounds ca_rel_abstract env_bound_map =
     G.add_edge_e ca_rel edge'
   ) ca_rel_abstract G.empty
 
+let print_edge_bound_map =
+  (* print bounds *)
+  List.iter (fun ((f,e,t), local_bounds) ->
+    Printf.printf "%2d -> %2d (%s): %s\n" f t (Cfg.pprint_edge_type e) (pprint_bound local_bounds)
+  )
+
 let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
   let cfg = Cfg.precompile cfg_not_precompiled in
 
@@ -375,11 +381,7 @@ let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
       (* quit the loop *)
       running := false ;
 
-      (* print bounds *)
-      List.iter (fun ((f,t), local_bounds) ->
-        Printf.printf "%d -> %d:\t%s\n" f t (pprint_bound local_bounds) ;
-      ) edge_bound_map ;
-      Printf.printf "\n%!" ;
+      print_edge_bound_map edge_bound_map ;
 
       (* write cfg w/ bounds to file file *)
       let module CfgDot = Cfg.Dot (struct
