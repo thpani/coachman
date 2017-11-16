@@ -3,7 +3,7 @@
 OCB_FLAGS = -use-ocamlfind -I src -I src/programs -I src/heaps
 OCB = ocamlbuild $(OCB_FLAGS)
 
-TREIBER := testt_emp testt_pop testt_push
+TREIBER := testt testt_emp testt_pop testt_push
 
 all: native
 
@@ -21,8 +21,5 @@ unit:
 	$(OCB) -package oUnit -I test/unit heaptest.native
 	./heaptest.native
 
-testt: native
-	@$(MAKE) -C test/e2e/treiber
-
 $(TREIBER): native
-	@$(MAKE) -C test/e2e/treiber $(patsubst testt_%,%,$@)
+	@$(MAKE) -C test/e2e/treiber $(patsubst _%,%,$(patsubst testt%,%,$@))
