@@ -353,7 +353,7 @@ let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
               EnvBoundMap.add effect_name new_bound acc_env_bound_map
             else acc_env_bound_map
         | _ -> acc_env_bound_map
-        in ((f,t), edge_bound) :: acc_bounds, bound_map
+        in ((f,edge_type,t), edge_bound) :: acc_bounds, bound_map
       ) cfg ([], EnvBoundMap.empty)
     in
 
@@ -384,8 +384,8 @@ let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
       (* write cfg w/ bounds to file file *)
       let module CfgDot = Cfg.Dot (struct
         let get_color = get_color
-        let get_label (f,(stmts,_),t) = 
-          let bound = List.assoc (f,t) edge_bound_map in
+        let get_label (f,(stmts,e),t) = 
+          let bound = List.assoc (f,e,t) edge_bound_map in
           Printf.sprintf "%s\n%s" (pprint_bound bound) (Cfg.pprint_seq stmts)
       end) in
       CfgDot.write_dot cfg_not_precompiled dot_basename "cfg_bounded" ;
