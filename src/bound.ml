@@ -36,9 +36,57 @@ end
 module EnvBoundMap = Map.Make(String)
 
 type bound = Bound of Z3.Expr.expr | Unbounded
+let pprint_bound_asymp = let open Z3 in
+  let symbol_to_string e = Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl e)) in
+  let get_const e =
+    if Expr.is_numeral e then
+      if (Arithmetic.Integer.get_int e) = 0 then Some "0" else Some "1"
+    else if Expr.is_const e then
+      Some (symbol_to_string e)
+    else
+      None
+  in
+  function
+  | Bound e -> Printf.sprintf "O(%s)" (
+    (* e is an addition of a numeral, constant, or multiplication of a numeral and constants *)
+    match get_const e with
+    | Some s -> s
+    | None ->
+        if Arithmetic.is_add e then
+          let args = Expr.get_args e in
+          let last_arg = List.nth args ((List.length args) - 1) in
+          (* e is in sum-of-monomials format, so this is the highest degree term *)
+          match get_const last_arg with
+          | Some s -> s
+          | None ->
+            (* strip out possible constant in multiplication *)
+            if Arithmetic.is_mul last_arg then
+              let mul_args = Expr.get_args last_arg in
+              let constants = match mul_args with
+                | first_arg :: tail_arg ->
+                    if Expr.is_numeral first_arg then
+                      List.fold_left (fun l arg -> (Expr.get_args arg) @ l) [] tail_arg
+                    else
+                      mul_args
+                | [] -> assert false
+              in
+              let occ_map = List.fold_left (fun map symbol ->
+                let id = symbol_to_string symbol in
+                let occ = match StringMap.find_opt id map with Some i -> i+1 | None -> 1 in
+                StringMap.add id occ map
+              ) StringMap.empty constants
+              in
+              List.fold_left (fun str (id, occ) ->
+                Printf.sprintf "%s%s^%d" str id occ
+              ) "" (StringMap.bindings occ_map)
+            else 
+              assert false
+        else assert false
+  )
+  | Unbounded -> "∞"
 let pprint_bound = function
-| Bound e -> Z3.Expr.to_string e
-| Unbounded -> "∞"
+  | Bound e -> Z3.Expr.to_string e
+  | Unbounded -> "∞"
 
 let pprint_edge (f,_,t) = Printf.sprintf "%s -> %s" (pprint_cloc f) (pprint_cloc t)
 
@@ -271,7 +319,7 @@ let refine_ca_rel_abstract_with_env_bounds ca_rel_abstract env_bound_map =
 let print_edge_bound_map =
   (* print bounds *)
   List.iter (fun ((f,e,t), local_bounds) ->
-    Printf.printf "%2d -> %2d (%s): %s\n" f t (Cfg.pprint_edge_type e) (pprint_bound local_bounds)
+    Printf.printf "%2d -> %2d (%s): %s %s\n" f t (Cfg.pprint_edge_type e) (pprint_bound_asymp local_bounds) (pprint_bound local_bounds)
   )
 
 let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
@@ -386,13 +434,14 @@ let compute_bounds dot_basename get_color init_heaps cfg_not_precompiled =
       running := false ;
 
       print_edge_bound_map edge_bound_map ;
+      print_newline () ;
 
       (* write cfg w/ bounds to file file *)
       let module CfgDot = Cfg.Dot (struct
         let get_color = get_color
         let get_label (f,(stmts,e),t) = 
           let bound = List.assoc (f,e,t) edge_bound_map in
-          Printf.sprintf "%s\n%s" (pprint_bound bound) (Cfg.pprint_seq stmts)
+          Printf.sprintf "%s\n%s\n%s" (pprint_bound_asymp bound) (pprint_bound bound) (Cfg.pprint_seq stmts)
       end) in
       CfgDot.write_dot cfg_not_precompiled dot_basename "cfg_bounded" ;
     )
