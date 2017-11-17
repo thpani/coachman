@@ -4,12 +4,12 @@ def enq begin
     tail := Tail;
     next := tail.next;
     if next = null then
-      if CAS(tail.next, next, node) then
-        CAS(Tail, tail, node);
+      if CAS(tail.next, next, node, enq) then
+        CAS(Tail, tail, node, enq_swing);
         break;
       fi
     else
-      CAS(Tail, tail, next);
+      CAS(Tail, tail, next, enq_swing);
     fi
   od
 end

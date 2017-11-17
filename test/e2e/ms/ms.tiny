@@ -1,0 +1,33 @@
+def enq begin
+  node := new;
+  while true do
+    tail := Tail;
+    next := tail.next;
+    if next = null then
+      if CAS(tail.next, next, node, enq) then
+        CAS(Tail, tail, node, enq_swing);
+        break;
+      fi
+    else
+      CAS(Tail, tail, next, enq_swing);
+    fi
+  od
+end
+
+def deq begin
+  while true do
+    head := Head;
+    tail := Tail;
+    next := head.next;
+    if !(head = Head) then continue; fi
+    if head = tail then
+      if next = null then break;
+      else CAS(Tail, tail, next, deq_swing);
+      fi
+    else
+      if CAS(Head, head, next, deq) then
+        break;
+      fi
+    fi
+  od
+end
