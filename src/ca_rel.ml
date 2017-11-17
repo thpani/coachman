@@ -151,31 +151,33 @@ module SCC = Components.Make(G)
 
 (* }}} *)
 
-let abstract ctx vars expr highest_prime = StringSet.fold (fun var map ->
-  let check_diff_constr pred =
+let abstract ctx transrel highest_prime var =
+    let s = Solver.mk_solver ctx None in
     let c = mk_const ctx 0 var in
     let c' = mk_const ctx highest_prime var in
-    let constr = pred ctx c' c in
-    let impl = Boolean.mk_implies ctx expr constr in
+    let constr = Arithmetic.mk_lt ctx c' c in
+    let impl = Boolean.mk_implies ctx transrel constr in
     let sat_problem = Boolean.mk_not ctx impl in
-    (* Printf.printf "%s\n" (Expr.to_string sat_problem); *)
-    let s = Solver.mk_solver ctx None in
     Solver.add s [ sat_problem ] ;
-    let result = Solver.check s [] in
-    result = Solver.UNSATISFIABLE (*, constr 1*)
-  in
-  let kind =
-    if check_diff_constr Arithmetic.mk_le then
-      if check_diff_constr Arithmetic.mk_lt then Strict
-      else NonStrict
-    else DontKnow
-  in
-  StringMap.add var kind map
-) vars StringMap.empty
+    match Solver.check s [] with
+    | Solver.UNSATISFIABLE -> Strict
+    | _ ->
+      let constr = Arithmetic.mk_le ctx c' c in
+      let impl = Boolean.mk_implies ctx transrel constr in
+      let sat_problem = Boolean.mk_not ctx impl in
+      Solver.add s [ sat_problem ] ;
+      match Solver.check s [] with
+      | Solver.UNSATISFIABLE -> NonStrict
+      | _ -> DontKnow
+
+let abstract_vars ctx transrel highest_prime vars =
+  StringSet.fold (fun var map ->
+    StringMap.add var (abstract ctx transrel highest_prime var) map
+  ) vars StringMap.empty
 
 let of_concrete ctx vars ca_rel =
-  let ca_rel_abstract = Concrete.G.fold_edges_e (fun (from, ((expr, highest_prime), summary), to_) ca_rel ->
-    let diff_constr = abstract ctx vars expr highest_prime in
+  let ca_rel_abstract = Concrete.G.fold_edges_e (fun (from, ((transrel, highest_prime), summary), to_) ca_rel ->
+    let diff_constr = abstract_vars ctx transrel highest_prime vars in
     G.add_edge_e ca_rel (from, (diff_constr, summary), to_)
   ) ca_rel G.empty in
   ca_rel_abstract
