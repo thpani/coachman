@@ -175,7 +175,9 @@ let fold_bounds ctx env_bound_map bounds =
       let c_expr = Ca_rel.mk_numeral ctx c in
       let var_bound_exprs = List.map (function Bound e -> e | Unbounded -> assert false) var_bounds in
       let sum_expr = Z3.Arithmetic.mk_add ctx (c_expr :: var_bound_exprs) in
-      Bound (Z3.Expr.simplify sum_expr None)
+      let params = Z3.Params.mk_params ctx in
+      Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
+      Bound (Z3.Expr.simplify sum_expr (Some params))
 
 let multiply_by_env_num ctx = function
   | Unbounded  -> Unbounded
@@ -184,7 +186,9 @@ let multiply_by_env_num ctx = function
       let one = Ca_rel.mk_numeral ctx 1 in
       let env_num = Z3.Arithmetic.mk_sub ctx [ n ; one ] in
       let mult_expr = Z3.Arithmetic.mk_mul ctx [ expr ; env_num ] in
-      Bound (Z3.Expr.simplify mult_expr None)
+      let params = Z3.Params.mk_params ctx in
+      Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
+      Bound (Z3.Expr.simplify mult_expr (Some params))
 
 let const_bound ctx i = Bound (Ca_rel.mk_numeral ctx i)
 let const_bound_0 ctx = const_bound ctx 0
