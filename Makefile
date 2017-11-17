@@ -18,8 +18,11 @@ sanity:
 	ocamlfind query ocamlgraph
 
 unit:
-	$(OCB) -package oUnit -I test/unit heaptest.native
-	./heaptest.native
+	$(OCB) -package oUnit -I test/unit sca.native
+	./sca.native
 
 $(TREIBER): native
 	@$(MAKE) -C test/e2e/treiber $(patsubst _%,%,$(patsubst testt%,%,$@))
+
+testms: native
+	@$(MAKE) -C test/e2e/ms
