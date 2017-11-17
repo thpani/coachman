@@ -56,13 +56,13 @@ let absv_seq man env absv stmts =
   let absv = List.fold_left (fun absv stmt -> match stmt with
     | Assume True ->
         absv
-  | Assume b ->
-      let tcons = bexpr_to_tcons_array env b in
-      let cons_absv = Abstract1.of_tcons_array man env tcons in
+    | Assume b ->
+        let tcons = bexpr_to_tcons_array env b in
+        let cons_absv = Abstract1.of_tcons_array man env tcons in
         Abstract1.meet man absv cons_absv
-  | Asgn (id, e) -> 
-      let var = Var.of_string id in
-      let texpr = nexpr_to_expr env e in
+    | Asgn (id, e) -> 
+        let var = Var.of_string id in
+        let texpr = nexpr_to_expr env e in
         Abstract1.assign_texpr man absv var texpr None
   ) absv stmts in
   (* 2. Bound each counter from below by 0. *)
@@ -213,31 +213,36 @@ let do_abstract_computation man env abs_map cfg =
     while not (abs_map_equal man !abs_map !prev_abs_map) do
       prev_abs_map := !abs_map ;
       abs_map := G.fold_vertex (fun vertex map ->
-          let incoming_absv = G.fold_pred_e (fun (fvertex, (stmts, _), _) l ->
-            let absv_fploc = AbsMap.find fvertex !abs_map in
+        let incoming_absv = G.fold_pred_e (fun (fvertex, (stmts, _), _) l ->
+          let absv_fploc = AbsMap.find fvertex !abs_map in
           (absv_seq man env absv_fploc stmts) :: l
         ) cfg vertex [] in
         let absv_list = (AbsMap.find vertex !abs_map) :: incoming_absv in
         let absv = Abstract1.join_array man (Array.of_list absv_list) in
-          let widened_itvl_array = Array.map (fun var ->
-            let itvl = Abstract1.bound_variable man absv var in
-            let testitvl = Interval.of_int 1 3 in
-            if Interval.is_leq testitvl itvl then Interval.top else itvl
-          ) vars
-          in
-          let widened_absv = Abstract1.of_box man env vars widened_itvl_array in
-          AbsMap.add vertex widened_absv map
+        let widened_itvl_array = Array.map (fun var ->
+          let itvl = Abstract1.bound_variable man absv var in
+          let testitvl = Interval.of_int 1 3 in
+          if Interval.is_leq testitvl itvl then Interval.top else itvl
+        ) vars
+        in
+        let widened_absv = Abstract1.of_box man env vars widened_itvl_array in
+        AbsMap.add vertex widened_absv map
       ) cfg !abs_map
     done ;
-    (* AbsMap.iter (fun cloc absv -> *)
-    (*   let box = (Abstract1.to_box man absv) in *)
-    (*   Format.printf "%s %a %a@." (pprint_cloc cloc) (fun x -> Environment.print x) box.Apron.Abstract1.box1_env (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array *)
-    (* ) !abs_map ; *)
     man, env, !abs_map
   end
   with Manager.Error e -> Printf.eprintf "ERROR: %s; %s\n" e.Apron.Manager.msg (Manager.string_of_funid e.Apron.Manager.funid) ; raise (Manager.Error e)
 
 let do_abstract_computation_initial_values init_clocs vars cfg =
+  (* let pprint_constr = List.iter (fun (var, itvl) -> *)
+  (*   Format.printf "%s |-> %a@." var Interval.print itvl *)
+  (* ) in *)
+  (* Printf.printf "Initial intervals:\n" ; *)
+  (* List.iter (fun (cloc, constr) -> *)
+  (*   Printf.printf "%s" (pprint_cloc cloc); *)
+  (*   pprint_constr constr ; *)
+  (*   print_newline () *)
+  (* ) init_clocs ; *)
   let man = Box.manager_alloc () in
   let var_array = Array.of_list vars in
   let vars = Array.map Var.of_string var_array in
