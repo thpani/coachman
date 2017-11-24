@@ -1,9 +1,14 @@
 open Ca_seq
 open Util.Z3
 
-open Scfg
-open Z3
+(* type declarations {{{ *)
 
+type highest_prime = int
+type transrel = Expr.expr * highest_prime
+
+(* }}} *)
+
+(* statements to transition relations {{{ *)
 
 let identity_rel ctx num_prime vars =
   let consts  = List.map (mk_const' ctx num_prime) vars in
@@ -40,8 +45,7 @@ let torel_seq ctx stmts vars =
     let expr = Quantifier.expr_of_quantifier quantifier in
     expr
 
-type highest_prime = int
-type transrel = Z3.Expr.expr * highest_prime
+(* }}} *)
 
 (* graph module declarations {{{ *)
 
@@ -50,30 +54,25 @@ module G = Scfg.G(struct
 
   type edge_label = transrel
 
-  let compare_edge_label (e1,_) (e2,_) = Z3.Expr.compare e1 e2
-  let equal_edge_label   (e1,_) (e2,_) = Z3.Expr.equal e1 e2
+  let compare_edge_label (e1,_) (e2,_) = Expr.compare e1 e2
+  let equal_edge_label   (e1,_) (e2,_) = Expr.equal e1 e2
   let default_edge_label               = Boolean.mk_true (mk_context []), 0
-  let pprint_edge_label (e,_) = Z3.Expr.to_string e
+  let pprint_edge_label (e,_) = Expr.to_string e
 
   let color_edge _  = 0
 end)
 
 (* }}} *)
 
-let ctr_of_node n = Printf.sprintf "x_%d" n
+(* conversion from sequential CA {{{ *)
 
-let error_sink = 
-  let open Cavertex in
-  let error_ploc = -99 in
-  error_ploc, { nodes = NodeSet.empty ; succ = NodeMap.empty ; var = VariableMap.empty }
-
-
-let qe ctx num_stmt vars expr =
+(** [qe ctx highest_prime vars expr] performs quantifier elimination on an expression [expr] over variables [vars], where variables with [1 <= highest_prime] primes are existentially quantified. The returned expression ranges over unprimed and (singly) primed variables. *)
+let qe ctx highest_prime vars expr =
   let open Tactic in
   let open ApplyResult in
   let open Goal in
   let var' = List.map (mk_const' ctx 1) vars in
-  let var_primed = List.map (mk_const' ctx num_stmt) vars in
+  let var_primed = List.map (mk_const' ctx highest_prime) vars in
   let goal = mk_goal ctx false false false in
   Goal.add goal [ expr ];
   let ar = apply (mk_tactic ctx "qe-light") goal None in
@@ -82,6 +81,7 @@ let qe ctx num_stmt vars expr =
   let sub_expr = Expr.substitute expr var_primed var' in
   Expr.simplify sub_expr None
 
+(** [of_seq ctx ca] converts a CA with sequential edge labels [ca] into one with transition relations as edge labels. *)
 let of_seq ctx ?(do_qe=true) ca =
   let vars = collect_vars ca in
   Ca_seq.G.fold_edges_e (fun (from, (stmts, summary), to_) ca_rel ->
@@ -94,3 +94,4 @@ let of_seq ctx ?(do_qe=true) ca =
       G.add_edge_e ca_rel (from, ((expr, highest_prime), summary), to_)
   ) ca G.empty
 
+(* }}} *)
