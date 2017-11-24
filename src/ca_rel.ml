@@ -82,7 +82,7 @@ let qe ctx num_stmt vars expr =
   let sub_expr = Expr.substitute expr var_primed var' in
   Expr.simplify sub_expr None
 
-let of_ca ctx ?(do_qe=true) ca =
+let of_seq ctx ?(do_qe=true) ca =
   let vars = collect_vars ca in
   Ca_seq.G.fold_edges_e (fun (from, (stmts, summary), to_) ca_rel ->
     let highest_prime = List.length stmts in

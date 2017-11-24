@@ -58,7 +58,7 @@ let process_function init_heaps summaries (fun_name, ast) =
   (* CfgDot.write_dot cfg dot_basename "cfg" ; *)
   (* CfgDot.write_dot cfg_with_summaries dot_basename "cfg_summaries" ; *)
 
-  Bound.compute_bounds dot_basename get_color init_heaps cfg_with_summaries
+  Bound.compute_bounds ~dot_basename:dot_basename ~get_edge_color:get_color init_heaps cfg_with_summaries
 
 let main () =
   let init_heaps, functions, summaries = parse_input () in

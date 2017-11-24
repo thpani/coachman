@@ -288,7 +288,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
     | stmts -> (* atomic sequence of statements *)
       Debugger.debug "ca_construction" "  ATOMIC TRANSITION COMPUTATION:\n" ;
       let cfg = Cfg.from_ast (Cfg.to_ast_stmt stmts) in
-      let bicfg = from_cfg ~indent:2 ~introduce_assume_false:true [(0,hfrom)] cfg in
+      let bicfg = from_cfg ~indent:2 ~introduce_assume_false:true cfg (0,hfrom) in
       let final_vertices = G.fold_vertex (fun v l -> match G.succ bicfg v with [] -> v :: l | _ -> l) bicfg [] in
       let paths = List.map (fun final -> 
         let ploc, heap = final in
@@ -311,7 +311,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
         if Cavertex.equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
       ) paths in
       paths_seq
-and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
+and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
   (* Rationale for `introduce_assume_false':
    * For ordinary CA construction, it makes no sense to follow atomic statements
    * that include an `assume(false)' and `introduce_assume_false' should be kept
@@ -347,10 +347,8 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) init_clocs cfg =
     | None -> None
   in
   (* add inital vertex to graph and worklist *)
-  List.iter (fun init_ca_loc ->
-    G.Imp.add_vertex g init_ca_loc ;
-    Queue.add init_ca_loc q
-  ) init_clocs ;
+  G.Imp.add_vertex g init_ca_loc ;
+  Queue.add init_ca_loc q ;
   (* while there are nodes in the worklist *)
   while not (Queue.is_empty q) do
     let from_vertex = Queue.pop q in

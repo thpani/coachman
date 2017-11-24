@@ -234,7 +234,7 @@ let do_abstract_computation man env abs_map cfg =
   end
   with Manager.Error e -> Printf.eprintf "ERROR: %s; %s\n" e.Apron.Manager.msg (Manager.string_of_funid e.Apron.Manager.funid) ; raise (Manager.Error e)
 
-let do_abstract_computation_initial_values init_ca_locs_with_constraints vars cfg =
+let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
   (* let pprint_constr = List.iter (fun (var, itvl) -> *)
   (*   Format.printf "%s |-> %a@." var Interval.print itvl *)
   (* ) in *)
@@ -257,10 +257,11 @@ let do_abstract_computation_initial_values init_ca_locs_with_constraints vars cf
     | None -> Interval.top
   ) vars in
   let abs_map = G.fold_vertex (fun current_cloc map ->
-    let init_heap = List.find_opt (fun (init_cloc, _) -> Cavertex.equal current_cloc init_cloc) init_ca_locs_with_constraints in
-    let absv = match init_heap with (* check if cloc is an initial vertex *)
-    | Some (_, itvl) -> Abstract1.of_box man env vars (init_interval itvl)
-    | None -> Abstract1.bottom man env
+    let absv =
+      if Cavertex.equal current_cloc init_ca_loc then
+        Abstract1.of_box man env vars (init_interval constraints)
+      else
+        Abstract1.bottom man env
     in
     VertexMap.add current_cloc absv map
   ) cfg VertexMap.empty

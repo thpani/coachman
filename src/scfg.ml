@@ -24,7 +24,8 @@ type edge_kind = E of string | S of string
 let pprint_edge_kind = function
   | E id -> Printf.sprintf "Effect %s" id
   | S id -> Printf.sprintf "Summary %s" id
-let effect_ID = let effect_ID_id = "ID" in E effect_ID_id
+let effect_ID_name = "ID"
+let effect_ID = E effect_ID_name
 
 module G (C:GConfig) = struct
   module V_ = struct

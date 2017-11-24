@@ -28,10 +28,18 @@ module Z3 = struct
   let mk_const' ctx num_primes id =
     let id' = id ^ (String.make num_primes '\'') in
     mk_const ctx id'
+  
+  (** [check ctx sat_problem] checks [sat_problem] for satisfiability. *)
+  let check ctx sat_problem =
+    let s = Solver.mk_solver ctx None in
+    Solver.add s [ sat_problem ] ;
+    Solver.check s []
 end
 
 (** Map integers to a set of colors. *)
 module Colormap = struct
+  type t = Scfg.edge_kind -> Graph.Graphviz.color
+
   (* [get_color i] maps [i] to a color. *)
   let get_color i =
     let colors = [ 0xff0000 ; 0x0000ff ; 0x00ff00 ; 0xff00ff ; 0xffff00 ; 0x00ffff ] in
