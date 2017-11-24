@@ -50,7 +50,7 @@ and pprint_seq ?(sep=";\n") ?(atomic_angles=true) stmts =
 (* graph module declarations {{{ *)
 
 module G = Scfg.G(struct
-  include GVertex
+  include Vertex
 
   type edge_label = stmt list
 
@@ -77,7 +77,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
     let var_eq a b =
       let get_node = function
         | Null  -> 0
-        | Id id -> Cavertex.VariableMap.find id hfrom.var
+        | Id id -> VariableMap.find id hfrom.var
         | Next id -> raise (Invalid_argument "unsupported comparison with next. introduce __dummy := x.next and compare __dummy instead.")
     in (get_node a) = (get_node b)
     in
@@ -110,7 +110,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
     let succ = NodeMap.add m succ_n (NodeMap.add n m (NodeMap.remove n s.succ)) in
     { nodes ; succ ; var = s.var }
   in
-  if Cavertex.equal (lfrom, hfrom) error_sink then
+  if equal (lfrom, hfrom) error_sink then
     [ [Assume True], error_sink ]
   else match stmts with
   | [ s ] -> begin match s with
@@ -308,7 +308,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
       ) final_vertices in
       let paths_seq = List.map (fun (path, (ploc, heap)) ->
         List.concat (List.map (fun (_, (stmt,_), _) -> stmt) path),
-        if Cavertex.equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
+        if equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
       ) paths in
       paths_seq
 and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
@@ -354,7 +354,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
     let from_vertex = Queue.pop q in
     let from, from_heap = from_vertex in
     Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
-      Debugger.debug "ca_construction" "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (Cavertex.pprint from_vertex) ;
+      Debugger.debug "ca_construction" "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (pprint from_vertex) ;
       let translated = get_next from_vertex stmt to_ in
       List.iter (fun (tstmt, (to_, to_heap)) ->
         let has_assume_false = List.mem (Assume False) tstmt in
@@ -363,10 +363,10 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
           let tstmt = List.filter (fun stmt -> stmt <> Assume True) tstmt in
           let tstmt = match tstmt with [] -> [ Assume True ] | _ -> tstmt in
           let to_vertex = to_, to_heap in
-          Debugger.debug "ca_construction" "%s%s%s (%s)" indent indent (Cavertex.pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
+          Debugger.debug "ca_construction" "%s%s%s (%s)" indent indent (pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
           let tstmt, to_heap, to_vertex = match rename_max_node g tstmt to_vertex with
           | Some (rename_from, rename_to, renamed_structure) ->
-              Debugger.debug "ca_construction" " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (Cavertex.pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
+              Debugger.debug "ca_construction" " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
               tstmt @ [ Asgn (ctr_of_node rename_to, Id (ctr_of_node rename_from)) ], renamed_structure, (to_, renamed_structure)
           | None ->
               Debugger.debug "ca_construction" "\n" ;
@@ -374,7 +374,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
           in
           let has_to_vertex = G.Imp.mem_vertex g to_vertex in
           G.Imp.add_edge_e g (from_vertex, (tstmt, summary), to_vertex) ;
-          if not has_assume_false && not has_to_vertex && not (Cavertex.equal to_vertex error_sink) then Queue.add to_vertex q
+          if not has_assume_false && not has_to_vertex && not (equal to_vertex error_sink) then Queue.add to_vertex q
         end
       ) translated
       end

@@ -28,7 +28,7 @@ let pprint_transition l =
 (* graph module declarations {{{ *)
 
 module G = Scfg.G(struct
-  include GVertex
+  include Vertex
 
   type edge_label = sc_transition
 

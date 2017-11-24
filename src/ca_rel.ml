@@ -50,7 +50,7 @@ let torel_seq ctx stmts vars =
 (* graph module declarations {{{ *)
 
 module G = Scfg.G(struct
-  include Cavertex.GVertex
+  include Cavertex.Vertex
 
   type edge_label = transrel
 

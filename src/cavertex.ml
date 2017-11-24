@@ -1,4 +1,12 @@
+(* type declarations {{{ *)
+
 type node_id = int
+type variable = string
+
+(* }}} *)
+
+(* data structure type declarations {{{ *)
+
 module Node = struct
   type t = node_id
   let compare = Pervasives.compare
@@ -15,7 +23,6 @@ module NodeMap = struct
     Printf.sprintf "{%s}" bindings_string
 end
 
-type variable = string
 module Variable = struct 
   type t = variable
   let compare = Pervasives.compare
@@ -30,15 +37,22 @@ module VariableMap = struct
   let pprint m =
     let bindings_string = String.concat "," (List.map pprint_binding (bindings m)) in
     Printf.sprintf "{%s}" bindings_string
-end 
+end
 
-type node = int
+(* }}} *)
+
+(* structure type declarations {{{ *)
+
 type node_set = NodeSet.t
 type succ_map = node_id NodeMap.t
 type var_map = node_id VariableMap.t
 type ploc = int
 type structure = { nodes : node_set ; succ : succ_map ; var : var_map }
 type ca_loc = ploc * structure
+
+(* }}} *)
+
+(* equal / compare / hash {{{ *)
 
 (* TODO can we use polymorphic compare / equal / hash here? *)
 let compare (loc,s) (loc',s') = match Pervasives.compare loc loc' with
@@ -75,6 +89,10 @@ let equal
   NodeMap.equal Pervasives.(=) s1 s2 &&
   VariableMap.equal Pervasives.(=) v1 v2
 
+(* }}} *)
+
+(* pretty printing functions {{{ *)
+
 let pprint_structure ?(sep=", ") structure =
   Printf.sprintf "nodes: %s%ssuccs: %s%svars: %s"
     (NodeSet.pprint structure.nodes) sep
@@ -84,7 +102,11 @@ let pprint_structure ?(sep=", ") structure =
 let pprint ?(sep=", ") (p, s) =
   Printf.sprintf "pc: %d%s%s" p sep (pprint_structure ~sep s)
 
-module GVertex = struct
+(* }}} *)
+
+(* partial graph module for CA vertices {{{ *)
+
+module Vertex = struct
   type vertex = ca_loc
 
   let compare_vertex = compare
@@ -94,3 +116,5 @@ module GVertex = struct
 
   let pprint_vertex v = pprint v
 end
+
+(* }}} *)
