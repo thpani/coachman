@@ -1,17 +1,21 @@
 open Ca_sca
-open Cavertex
+open Ca_vertex
 open Debugger
 open Util
 
-type var_abs_map = Apron.Interval.t Cavertex.VariableMap.t
-type ca_loc_with_constraints = Cavertex.ca_loc * var_abs_map
+module VariableSet = Util.DS.IdentifierSet
+module VariableMap = Util.DS.IdentifierMap
+module EnvBoundMap = Util.DS.IdentifierMap
+
+type var_abs_map = Apron.Interval.t VariableMap.t
+type ca_loc_with_constraints = Ca_vertex.ca_loc * var_abs_map
 
 module Candidate = struct
-  type bound = Const of int | Var of Cavertex.VariableSet.t | Unbounded
+  type bound = Const of int | Var of VariableSet.t | Unbounded
 
   let pprint_bound = function 
     | Const i -> string_of_int i
-    | Var l -> Cavertex.VariableSet.pprint l
+    | Var l -> VariableSet.pprint l
     | Unbounded -> "∞"
   let pprint_bound_factor factor = function
     | Const 0 -> "0"
@@ -20,7 +24,6 @@ module Candidate = struct
     | bound ->  Printf.sprintf "%s × (%s)" (pprint_bound bound) factor
 end
 
-module EnvBoundMap = Map.Make(String)
 
 type bound = Bound of Z3.Expr.expr | Unbounded
 
@@ -60,7 +63,7 @@ let pprint_bound_asymp bound = let open Z3 in
                       mul_args
                 | [] -> assert false
               in
-              let open Cavertex in
+              let open Ca_vertex in
               let occ_map = List.fold_left (fun map symbol ->
                 let id = symbol_to_string symbol in
                 let occ = match VariableMap.find_opt id map with Some i -> i+1 | None -> 1 in
@@ -81,7 +84,7 @@ let pprint_bound = function
   | Unbounded -> "∞"
 
 let get_local_bounds vars ca =
-  let open Cavertex in
+  let open Ca_vertex in
   let sccs = Ca_sca.G.scc_edges ca in
   let local_bounds = List.map (fun scc ->
     let var_edge_map = VariableSet.fold (fun var map ->
@@ -121,11 +124,11 @@ let get_local_bounds vars ca =
             Debugger.debug "local_bound" "Unbounded.\n" ;
             Candidate.Unbounded
           end else begin
-            (* Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (Cavertex.VariableSet.to_string ranking_vars) ; *)
+            (* Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (Ca_vertex.VariableSet.to_string ranking_vars) ; *)
             Candidate.Var ranking_vars
           end
         end else begin
-          (* Debugger.debug "local_bound" "ranked by %s.\n" (Cavertex.VariableSet.to_string ranking_vars) ; *)
+          (* Debugger.debug "local_bound" "ranked by %s.\n" (Ca_vertex.VariableSet.to_string ranking_vars) ; *)
           Candidate.Var ranking_vars
         end
       in edge, local_bound
@@ -163,11 +166,11 @@ let pick_summary_counter_if_possible set =
   (* TODO we prefer summary counters here, because we can bound we know their
    * invairant by construction. In general, we should select the variable with 
    * minimal bound here. *)
-  let summary_counters = Cavertex.VariableSet.filter is_summary_ctr set in
-  if Cavertex.VariableSet.is_empty summary_counters then
-    Cavertex.VariableSet.min_elt set
+  let summary_counters = VariableSet.filter is_summary_ctr set in
+  if VariableSet.is_empty summary_counters then
+    VariableSet.min_elt set
   else
-    Cavertex.VariableSet.min_elt summary_counters
+    VariableSet.min_elt summary_counters
 
 let hitting_set_approx vars =
   (* Select minimal set of variables present in all Var bounds.
@@ -176,10 +179,10 @@ let hitting_set_approx vars =
   * (1) checking the intersection over all variable sets.
   * (2) greedily picking one variable from each variable set. *)
   let common_vars = match vars with
-    | varset :: _ -> List.fold_left Cavertex.VariableSet.inter varset vars
-    | []          -> Cavertex.VariableSet.empty
+    | varset :: _ -> List.fold_left VariableSet.inter varset vars
+    | []          -> VariableSet.empty
   in
-  if Cavertex.VariableSet.is_empty common_vars then
+  if VariableSet.is_empty common_vars then
     List.map pick_summary_counter_if_possible vars
   else
     [ pick_summary_counter_if_possible common_vars ]
@@ -312,7 +315,7 @@ let print_edge_bound_map =
 )
 
 let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
-  Printf.printf "# Computing bounds for initial heap %s\n%!" (Cavertex.pprint init_ca_loc) ;
+  Printf.printf "# Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
 
   (* Get lists of summary, effect names from CFG *)
   let summaries, effects = Cfg.G.fold_edges_e (fun (_,(_,summary_ref),_) (summaries, effects) ->

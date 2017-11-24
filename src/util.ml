@@ -45,3 +45,25 @@ module Colormap = struct
     let colors = [ 0xff0000 ; 0x0000ff ; 0x00ff00 ; 0xff00ff ; 0xffff00 ; 0x00ffff ] in
     List.nth colors (i mod (List.length colors))
 end
+
+(** Set and map over identifiers. *)
+module DS = struct
+  type identifier = string
+
+  module Identifier = struct 
+    type t = identifier
+    let compare = Pervasives.compare
+  end
+  module IdentifierSet = struct
+    include Set.Make(Identifier)
+    let pprint s = "{" ^ (String.concat "," (elements s)) ^ "}"
+  end
+  module IdentifierMap = struct
+    include Map.Make(Identifier)
+    let pprint_binding (v,n) = Printf.sprintf "%s:%d" v n
+    let pprint m =
+      let bindings_string = String.concat "," (List.map pprint_binding (bindings m)) in
+      Printf.sprintf "{%s}" bindings_string
+  end
+
+end

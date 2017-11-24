@@ -1,7 +1,6 @@
 (* type declarations {{{ *)
 
 type node_id = int
-type variable = string
 
 (* }}} *)
 
@@ -23,21 +22,7 @@ module NodeMap = struct
     Printf.sprintf "{%s}" bindings_string
 end
 
-module Variable = struct 
-  type t = variable
-  let compare = Pervasives.compare
-end
-module VariableSet = struct
-  include Set.Make(Variable)
-  let pprint s = "{" ^ (String.concat "," (elements s)) ^ "}"
-end
-module VariableMap = struct
-  include Map.Make(Variable)
-  let pprint_binding (v,n) = Printf.sprintf "%s:%d" v n
-  let pprint m =
-    let bindings_string = String.concat "," (List.map pprint_binding (bindings m)) in
-    Printf.sprintf "{%s}" bindings_string
-end
+module VariableMap = Util.DS.IdentifierMap
 
 (* }}} *)
 

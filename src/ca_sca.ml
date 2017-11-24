@@ -1,10 +1,11 @@
-open Cavertex
+open Ca_vertex
 open Util.Z3
 
 open Z3
 
 (* type definitions {{{ *)
 
+type variable = string
 type sc_operator = Strict | NonStrict | DontKnow
 type sc_predicate = variable * sc_operator
 type sc_transition = sc_operator VariableMap.t
@@ -66,10 +67,10 @@ let abstract ctx transrel highest_prime var =
 
 (** [abstract_vars ctx transrel highest_prime vars] returns a map from variables [vars] to size-change predicates implied by transition relations [transrel]. [transrel] ranges over vars with highest prime [highest_prime]. *)
 let abstract_vars ctx transrel highest_prime vars =
-  let open Cavertex in
-  VariableSet.fold (fun var map ->
-    VariableMap.add var (abstract ctx transrel highest_prime var) map
-  ) vars VariableMap.empty
+  let open Util.DS in
+  IdentifierSet.fold (fun var map ->
+    IdentifierMap.add var (abstract ctx transrel highest_prime var) map
+  ) vars IdentifierMap.empty
 
 (** [of_concrete ctx vars ca_rel] abstracts a CA with relational edge labels [ca_rel] over variables [vars] into a size-change system. *)
 let of_concrete ctx vars ca_rel =

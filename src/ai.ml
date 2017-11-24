@@ -10,8 +10,8 @@ open Ca_seq
 (* data structure module declarations {{{ *)
 
 module VertexMap = Map.Make(struct
-  type t = Cavertex.ca_loc
-  let compare = Cavertex.compare
+  type t = Ca_vertex.ca_loc
+  let compare = Ca_vertex.compare
 end)
 
 let abs_map_equal man a b =
@@ -26,7 +26,7 @@ let print_absv man abs_map ca =
     let open Apron in
     let absv = VertexMap.find cloc abs_map in
     let box = Abstract1.to_box man absv in
-    Format.printf "%s %a@." (Cavertex.pprint cloc) (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
+    Format.printf "%s %a@." (Ca_vertex.pprint cloc) (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
   ) ca
 
 (* sequential (atomic) abstract execution {{{ *)
@@ -251,14 +251,14 @@ let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
   let vars, _ = Environment.vars env in
   let init_interval constr = Array.map (fun v ->
     let var_name = Var.to_string v in
-    let init_value = Cavertex.VariableMap.find_opt var_name constr in
+    let init_value = Ca_vertex.VariableMap.find_opt var_name constr in
     match init_value with
     | Some i -> i
     | None -> Interval.top
   ) vars in
   let abs_map = G.fold_vertex (fun current_cloc map ->
     let absv =
-      if Cavertex.equal current_cloc init_ca_loc then
+      if Ca_vertex.equal current_cloc init_ca_loc then
         Abstract1.of_box man env vars (init_interval constraints)
       else
         Abstract1.bottom man env

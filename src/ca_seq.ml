@@ -1,4 +1,4 @@
-open Cavertex
+open Ca_vertex
 
 (* AST type declarations {{{ *)
 
