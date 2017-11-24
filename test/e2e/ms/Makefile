@@ -1,8 +1,8 @@
-.PHONY: all emp emp_nolag deq deq_nolag
+.PHONY: all emp emp_nolag deq deq_nolag enq enq_nolag
 
 BIN = ../../../main.native
 
-all: emp emp_nolag deq deq_nolag
+all: emp emp_nolag deq deq_nolag enq enq_nolag
 
 emp:
 	$(BIN) ms.tiny ms.heap ../empty.summaries
@@ -15,3 +15,9 @@ deq:
 
 deq_nolag:
 	$(BIN) ms_deq.tiny ms_nolag.heap ms_deq.summaries
+
+enq:
+	$(BIN) ms_enq.tiny ms.heap ms_enq.summaries
+
+enq_nolag:
+	$(BIN) ms_enq.tiny ms_nolag.heap ms_enq.summaries
