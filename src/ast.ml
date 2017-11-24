@@ -24,7 +24,9 @@ type stmt =
   | Alloc of pexpr
   | Asgn of pexpr * pexpr
 
-type program = (identifier * stmt list) list
+type seq = stmt list
+
+type program = (identifier * seq) list
 
 (* }}} *)
 
@@ -56,12 +58,13 @@ let rec pprint_stmt ?(sep=";\n") = function
 and pprint_seq ?(sep=";\n") stmts =
   String.concat sep (List.map (pprint_stmt ~sep:sep) stmts)
 
-let pprint (fname, stmts) = Printf.sprintf "DEF %s BEGIN\n%s\nEND" fname (pprint_seq stmts)
+let pprint_function (fname, stmts) = Printf.sprintf "DEF %s BEGIN\n%s\nEND" fname (pprint_seq stmts)
 
-let pprint p = String.concat "\n" (List.map pprint p)
+let pprint_program p = String.concat "\n" (List.map pprint_function p)
 
 (* }}} *)
 
+(** Transform all (nested) atomic statements to normal statements. *)
 let rec unwrap_atomic = function
   | Atomic s :: tl -> (unwrap_atomic s) @ (unwrap_atomic tl)
   | s1       :: tl -> s1 :: (unwrap_atomic tl)

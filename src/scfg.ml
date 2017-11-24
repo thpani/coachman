@@ -73,6 +73,9 @@ module G (C:GConfig) = struct
   let pprint_edge (v,(l,et),v') = Printf.sprintf "%s: %s -> %s"
     (pprint_cfg_edge (v,(l,et),v')) (C.pprint_vertex v) (C.pprint_vertex v')
 
+  let equal_edge_ignore_labels (c1,et1,c1') (c2,(_,et2),c2') =
+    C.equal_vertex c1 c2 && C.equal_vertex c1' c2' && et1 = et2
+
   let equal_edge (c1,(l1,et1),c1') (c2,(l2,et2),c2') =
     C.equal_vertex c1 c2 && C.equal_vertex c1' c2' && C.equal_edge_label l1 l2 && et1 = et2
 

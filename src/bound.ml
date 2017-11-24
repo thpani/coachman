@@ -368,7 +368,7 @@ let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
 
-  let cfg_scc_edges = List.concat (Cfg.scc_edges cfg) in
+  let cfg_scc_edges = List.concat (Cfg.G.scc_edges cfg) in
 
   let iteration = ref 1 in
   let result = ref CfgEdgeMap.empty in
@@ -395,7 +395,8 @@ let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
                * If not, return constant bound 1. This gets us better constants
                * than testing on the CA; edges may be doubled there because of the
                * refined control structure. *)
-              let edge_belongs_to_cfg_scc = List.mem (f,t) cfg_scc_edges in
+              let edge_belongs_to_cfg_scc =
+                List.exists (Cfg.G.equal_edge_ignore_labels (f,edge_type,t)) cfg_scc_edges in
               if edge_belongs_to_cfg_scc then
                 fold_bounds ctx !env_bound_map ca_edge_local_bounds
               else

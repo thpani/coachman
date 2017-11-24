@@ -84,12 +84,6 @@ let pprint_structure ?(sep=", ") structure =
 let pprint ?(sep=", ") (p, s) =
   Printf.sprintf "pc: %d%s%s" p sep (pprint_structure ~sep s)
 
-module CaLoc = struct
-  type t = ca_loc
-  let compare = compare
-end
-module CaLocMap = Map.Make(CaLoc)
-
 module GVertex = struct
   type vertex = ca_loc
 
