@@ -1,6 +1,6 @@
 open Ca_vertex
 
-(* AST type declarations {{{ *)
+(* type declarations {{{ *)
 
 type identifier = string
 
@@ -24,7 +24,7 @@ type program = (identifier * stmt list) list
 
 (* }}} *)
 
-(* AST printing functions {{{ *)
+(* pretty printing functions {{{ *)
 
 let rec pprint_nexpr = function
   | Id id -> id
@@ -62,15 +62,13 @@ module G = Scfg.G(struct
   let color_edge _  = 0
 end)
 
+(* }}} *)
+
 let ctr_of_node n = Printf.sprintf "x_%d" n
 
 let error_sink = 
   let error_ploc = -99 in
   error_ploc, { nodes = NodeSet.empty ; succ = NodeMap.empty ; var = VariableMap.empty }
-
-(* }}} *)
-
-(* abstract transition / next heap structure for given structure / concrete statement {{{ *)
 
 let rec get_next (lfrom, hfrom) stmts lto =
   let rec simplify_guard = let open Cfg in
@@ -381,8 +379,6 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
     ) cfg from
   done ;
   G.Imp.fold_edges_e (fun edge acc_g -> G.add_edge_e acc_g edge) g G.empty
-
-(* }}} *)
 
 let structure_from_parsed_heaps heaps =
   List.map (fun heap -> 
