@@ -1,6 +1,4 @@
-open Graph
-
-(* type declarations {{{ *)
+(* stmt type declarations {{{ *)
 
 type identifier = string
 
@@ -20,14 +18,52 @@ type stmt =
   | Alloc of pexpr
   | Asgn of pexpr * pexpr
 
-type ploc = int
-type summary_id = int
+type seq = stmt list
 
-type edge_type = E of string | S of string
-let pprint_edge_type = function
-  | E name -> Printf.sprintf "effect %s" name
-  | S name -> Printf.sprintf "summary %s" name
-let effect_id = E "ID"
+(* }}} *)
+
+(* pretty printing functions {{{ *)
+
+let pprint_pexpr = function
+  | Null    -> "null"
+  | Id id   -> id
+  | Next id -> id ^ ".next"
+
+let rec pprint_bexpr = function
+  | True  -> "true"
+  | False -> "false"
+  | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
+  | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
+
+let rec pprint_stmt ?(sep=";\n") = function
+  | Assume g -> Printf.sprintf "assume(%s)" (pprint_bexpr g)
+  | Alloc p      -> Printf.sprintf "%s := new" (pprint_pexpr p)
+  | Asgn (a, b)  -> Printf.sprintf "%s := %s" (pprint_pexpr a) (pprint_pexpr b)
+
+and pprint_seq ?(sep=";\n") stmts =
+  String.concat sep (List.map (pprint_stmt ~sep:sep) stmts)
+
+(* }}} *)
+
+(* graph module declarations {{{ *)
+
+module G = Scfg.G(struct
+  type vertex = Scfg.ploc
+  type edge_label = seq
+
+  let compare_vertex = Pervasives.compare
+  let hash_vertex    = Hashtbl.hash
+  let equal_vertex   = Pervasives.(=)
+  let pprint_vertex  = string_of_int
+  let get_ploc v     = v
+
+  let compare_edge_label  = Pervasives.compare
+  let equal_edge_label    = Pervasives.(=)
+  let default_edge_label  = []
+  let pprint_edge_label l = pprint_seq l
+
+  let color_edge _  = 0
+end)
 
 (* }}} *)
 
@@ -70,80 +106,6 @@ let rec to_ast_stmt = List.map (function
   | Alloc p -> Ast.Alloc (to_ast_pexpr p)
   | Asgn (a, b) -> Ast.Asgn (to_ast_pexpr a, to_ast_pexpr b)
 )
-
-(* }}} *)
-
-(* printing functions {{{ *)
-
-let pprint_pexpr = function
-  | Null    -> "null"
-  | Id id   -> id
-  | Next id -> id ^ ".next"
-
-let rec pprint_bexpr = function
-  | True  -> "true"
-  | False -> "false"
-  | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
-  | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
-
-let rec pprint_stmt ?(sep=";\n") = function
-  | Assume g -> Printf.sprintf "assume(%s)" (pprint_bexpr g)
-  | Alloc p      -> Printf.sprintf "%s := new" (pprint_pexpr p)
-  | Asgn (a, b)  -> Printf.sprintf "%s := %s" (pprint_pexpr a) (pprint_pexpr b)
-
-and pprint_seq ?(sep=";\n") stmts =
-  String.concat sep (List.map (pprint_stmt ~sep:sep) stmts)
-
-(* }}} *)
-
-(* module declarations {{{ *)
-
-module V_ = struct
-  type t = ploc
-  let compare = compare
-  let hash = Hashtbl.hash
-  let equal = (=)
-end
-
-module E_ = struct
-  type t = stmt list * edge_type
-  let compare = compare
-  let default = [ Assume True ], E "Id"
-end
-
-module GImp = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
-module GChecker = Path.Check(GImp)
-
-module G = Persistent.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
-module SCC = Components.Make(G)
-
-module type Edgeable = sig
-  val get_color : G.edge -> int
-  val get_label : G.edge -> string
-end
-
-module Dot (X:Edgeable) = struct
-  include Graphviz.Dot (struct
-    include G
-    let graph_attributes _ = []
-    let default_vertex_attributes _ = []
-    let vertex_name v = "\"" ^ (string_of_int v) ^  "\""
-    let vertex_attributes _ = []
-    let get_subgraph _ = None
-    let default_edge_attributes _ = []
-    let edge_attributes edge = [
-      `Label (X.get_label edge) ;
-      `Color (X.get_color edge) ;
-      `Fontcolor (X.get_color edge)
-    ]
-  end)
-
-  let write_dot g dot_basename component =
-    let path = Printf.sprintf "%s.%s.dot" dot_basename component in
-    let chout = open_out path in
-    output_graph chout g ; close_out chout
-end
-
 
 (* }}} *)
 
@@ -206,8 +168,8 @@ let from_ast ast =
   let break_target = ref 0 in
   let continue_target = ref 0 in
   let did_goto = ref false in
-  let g = GImp.create() in
-  let max_vertex g = GImp.fold_vertex (fun v a -> max v a) g 0 in
+  let g = G.Imp.create() in
+  let max_vertex g = G.Imp.fold_vertex (fun v a -> max v a) g 0 in
   let next_vertex g = (max_vertex g) + 1 in
   let rec gen_cfg ast =
     List.iter (function
@@ -217,16 +179,16 @@ let from_ast ast =
           match guard with
             | CAS (a,b,c,d) ->
                 Atomic [ Assume (Eq(a, Id b)) ; Asgn(a, Id c) ],
-                E d,
+                Scfg.E d,
                 Atomic [ Assume(Neg(Eq(a, Id b))) ]
-            | _ -> Assume guard, effect_id, Assume (Neg guard)
+            | _ -> Assume guard, Scfg.effect_ID, Assume (Neg guard)
           in
           let selse = else_guard :: selse in
           let last_before_if = !last in
           begin match if_guard with
             | Ast.Atomic s ->
                 let next_v = next_vertex g in
-                GImp.add_edge_e g (!last, (from_ast_stmt s, if_guard_effect), next_v) ; last := next_v
+                G.Imp.add_edge_e g (!last, (from_ast_stmt s, if_guard_effect), next_v) ; last := next_v
             | _ -> gen_cfg [if_guard] 
           end ;
           did_goto := false ;
@@ -243,9 +205,9 @@ let from_ast ast =
           else begin
             let next_v = next_vertex g in
             if not did_goto_in_if then
-              GImp.add_edge_e g (last_after_if, ([Assume True], effect_id), next_v) ;
+              G.Imp.add_edge_e g (last_after_if, ([Assume True], Scfg.effect_ID), next_v) ;
             if not did_goto_in_else then
-              GImp.add_edge_e g (last_after_else, ([Assume True], effect_id), next_v) ;
+              G.Imp.add_edge_e g (last_after_else, ([Assume True], Scfg.effect_ID), next_v) ;
             last := next_v
           end
       | Ast.While(guard, stmts) ->
@@ -254,23 +216,23 @@ let from_ast ast =
           let stmts = Ast.Assume(guard) :: stmts in
           break_target := loop_exit ;
           continue_target := loop_head ;
-          GImp.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], effect_id), loop_exit) ;
+          G.Imp.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], Scfg.effect_ID), loop_exit) ;
           gen_cfg stmts ;
-          GImp.add_edge_e g (!last, ([Assume True], effect_id), loop_head) ;
+          G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), loop_head) ;
           last := max_vertex g
       | Ast.Break ->
-          Debugger.logf Debugger.Info "cfg" "Breaking to %d\n" !break_target ;
-          GImp.add_edge_e g (!last, ([Assume True], effect_id), !break_target) ;
+          Debugger.debug "cfg" "Breaking to %d\n" !break_target ;
+          G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), !break_target) ;
           did_goto := true
       | Ast.Continue ->
-          GImp.add_edge_e g (!last, ([Assume True], effect_id), !continue_target) ;
+          G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), !continue_target) ;
           did_goto := true
       | Ast.Atomic stmt ->
         let next_v = next_vertex g in
-        GImp.add_edge_e g (!last, (from_ast_stmt stmt, effect_id), next_v) ; last := next_v
+        G.Imp.add_edge_e g (!last, (from_ast_stmt stmt, Scfg.effect_ID), next_v) ; last := next_v
       | stmt ->
         let next_v = next_vertex g in
-        GImp.add_edge_e g (!last, (from_ast_stmt [stmt], effect_id), next_v) ; last := next_v
+        G.Imp.add_edge_e g (!last, (from_ast_stmt [stmt], Scfg.effect_ID), next_v) ; last := next_v
     ) ast
   in
   gen_cfg ast ;
@@ -282,48 +244,49 @@ let from_ast ast =
     | Neg s -> (match fold_boolean s with True -> False | False -> True | _ -> Neg s)
     | s -> s
   in
-  GImp.iter_edges_e (fun edge ->
+  G.Imp.iter_edges_e (fun edge ->
     match edge with
     | f, ([Assume s], et), t -> (
       let simplified_s = fold_boolean s in
-      GImp.remove_edge_e g edge ;
-      if simplified_s <> False then GImp.add_edge_e g (f, ([Assume simplified_s], et), t)
+      G.Imp.remove_edge_e g edge ;
+      if simplified_s <> False then G.Imp.add_edge_e g (f, ([Assume simplified_s], et), t)
     )
     | _ -> ()
   ) g ;
   (* Fold assume(true) edges *)
-  GImp.iter_vertex (fun vertex ->
-    match GImp.succ_e g vertex with
+  G.Imp.iter_vertex (fun vertex ->
+    match G.Imp.succ_e g vertex with
     | [ _, ([Assume True], et), succ ] -> (
       (* remove the assume true edge *)
-      GImp.remove_edge_e g (vertex, ([Assume True], et), succ) ;
+      G.Imp.remove_edge_e g (vertex, ([Assume True], et), succ) ;
 
       (* redirect all predecessor edges to the singleton successor *)
-      GImp.iter_pred_e (fun (pred, e, _) ->
-        GImp.remove_edge_e g (pred, e, vertex) ;
-        GImp.add_edge_e g (pred, e, succ)
+      G.Imp.iter_pred_e (fun (pred, e, _) ->
+        G.Imp.remove_edge_e g (pred, e, vertex) ;
+        G.Imp.add_edge_e g (pred, e, succ)
       ) g vertex ;
 
       (* if vertex = 0, rename the successor to 0 *)
       if vertex = 0 then begin
         let vertex_to_rename = succ in
-        GImp.iter_pred_e (fun (pred, e, _) ->
-          GImp.remove_edge_e g (pred, e, vertex_to_rename) ;
-          GImp.add_edge_e g (pred, e, 0)
+        G.Imp.iter_pred_e (fun (pred, e, _) ->
+          G.Imp.remove_edge_e g (pred, e, vertex_to_rename) ;
+          G.Imp.add_edge_e g (pred, e, 0)
         ) g vertex_to_rename ;
-        GImp.iter_succ_e (fun (_, e, succ) ->
-          GImp.remove_edge_e g (vertex_to_rename, e, succ) ;
-          GImp.add_edge_e g (0, e, succ)
+        G.Imp.iter_succ_e (fun (_, e, succ) ->
+          G.Imp.remove_edge_e g (vertex_to_rename, e, succ) ;
+          G.Imp.add_edge_e g (0, e, succ)
         ) g succ
       end
     )
     | _ -> () (* not a single successor reachable via assume stmt *)
   ) g ;
   (* Remove unreachable vertices *)
-  GImp.iter_vertex (fun v ->
-    if not (GChecker.check_path (GChecker.create g) 0 v) then GImp.remove_vertex g v
+  let module PathChecker = Graph.Path.Check(G.Imp) in
+  G.Imp.iter_vertex (fun v ->
+    if not (PathChecker.check_path (PathChecker.create g) 0 v) then G.Imp.remove_vertex g v
   ) g ;
-  GImp.fold_edges_e (fun edge acc_g -> G.add_edge_e acc_g edge) g G.empty
+  G.Imp.fold_edges_e (fun edge acc_g -> G.add_edge_e acc_g edge) g G.empty
 
 (* }}} *)
 
@@ -332,12 +295,12 @@ let add_summaries cfg summaries =
     let summary_seq = Ast.unwrap_atomic stmts in
     let summary_nested_list = from_ast_stmt summary_seq in
     G.fold_vertex (fun v cfg ->
-      G.add_edge_e cfg (v, (summary_nested_list, S summary_name), v)
+      G.add_edge_e cfg (v, (summary_nested_list, Scfg.S summary_name), v)
     ) cfg cfg
   ) cfg summaries
 
 let scc_edges g = 
-  let scc_list = SCC.scc_list g in
+  let scc_list = G.scc_list g in
   List.map (fun scc_vertices ->
     (* for this SCC... *)
     List.fold_left (fun l scc_vertex_from ->

@@ -8,7 +8,7 @@ let position_string lexbuf =
 
 let set_debug_level () = match Sys.getenv_opt "DEBUG" with
   | Some s ->
-      Debugger.current_level := Debugger.Info ;
+      Debugger.current_level := Debugger.Debug ;
       Debugger.current_components := (String.split_on_char ',' s)
   | None   -> ()
 
@@ -29,7 +29,7 @@ let parse_input () =
   in
   let parse_heap =
     let parsed = parse fn_heap Parser_heap.heaps Lexer_heap.token in
-    Ca.structure_from_parsed_heaps parsed
+    Ca_seq.structure_from_parsed_heaps parsed
   in
   let parse_program path = parse path Parser.program Lexer.token in
   let init_heaps = parse_heap in
@@ -37,26 +37,26 @@ let parse_input () =
   let summaries = parse_program fn_summary in
   init_heaps, functions, summaries
 
-let pprint_summaries summaries = String.concat ", " (List.map fst summaries)
+let pprint_summaries summaries = String.concat " || " (List.map (fun s -> Printf.sprintf "G(%s)" (fst s)) summaries)
 
 let process_function init_heaps summaries (fun_name, ast) = 
-  Printf.printf "%s || summaries %s\n" fun_name (pprint_summaries summaries) ;
+  Printf.printf "%s || %s\n" fun_name (pprint_summaries summaries) ;
   let fn_prog_basename = Filename.remove_extension (Filename.basename fn_prog) in
   let dot_basename = Printf.sprintf "%s.%s" fn_prog_basename fun_name in
 
   let cfg                = Cfg.from_ast ast in
   let cfg_with_summaries = Cfg.add_summaries cfg summaries in
 
-  let get_color (_,(_,edge_type),_) = match edge_type with
-    | Cfg.S name -> Colormap.get_color (Util.List.find name (List.map fst summaries))
+  let get_color edge_type = match edge_type with
+    | Scfg.S name -> Util.Colormap.get_color (Util.List.find name (List.map fst summaries))
     | _ -> 0x000000
   in
-  let module CfgDot = Cfg.Dot(struct
-    let get_color = get_color
-    let get_label (_,(stmts,_),_) = Cfg.pprint_seq stmts
-  end) in
-  CfgDot.write_dot cfg dot_basename "cfg" ;
-  CfgDot.write_dot cfg_with_summaries dot_basename "cfg_summaries" ;
+  (* let module CfgDot = Cfg.Dot(struct *)
+  (*   let get_color (_,(_,et),_) = get_color et *)
+  (*   let get_label (_,(stmts,_),_) = Cfg.pprint_seq stmts *)
+  (* end) in *)
+  (* CfgDot.write_dot cfg dot_basename "cfg" ; *)
+  (* CfgDot.write_dot cfg_with_summaries dot_basename "cfg_summaries" ; *)
 
   Bound.compute_bounds dot_basename get_color init_heaps cfg_with_summaries
 

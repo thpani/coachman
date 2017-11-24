@@ -1,5 +1,6 @@
 open Apron
-open Ca
+
+open Ca_seq
 
 (* USAGE: *)
 (* let man, env, abs_map = Ai.do_abstract_computation_initial_values init_heaps ca in *)
@@ -8,24 +9,24 @@ open Ca
 
 (* data structure module declarations {{{ *)
 
-module AbsMap = Map.Make(struct
-  type t = cloc
-  let compare x y = compare (pprint_cloc x) (pprint_cloc y)
+module VertexMap = Map.Make(struct
+  type t = Cavertex.ca_loc
+  let compare = Cavertex.compare
 end)
 
 let abs_map_equal man a b =
-  AbsMap.for_all (fun ploc absv -> match AbsMap.find_opt ploc b with
+  VertexMap.for_all (fun ploc absv -> match VertexMap.find_opt ploc b with
     | Some absv' -> Abstract1.is_eq man absv absv'
     | None       -> false) a
 
 (* }}} *)
 
 let print_absv man abs_map ca =
-  Ca.G.iter_vertex (fun cloc ->
+  Ca_seq.G.iter_vertex (fun cloc ->
     let open Apron in
-    let absv = AbsMap.find cloc abs_map in
+    let absv = VertexMap.find cloc abs_map in
     let box = Abstract1.to_box man absv in
-    Format.printf "%s %a@." (Ca.pprint_cloc cloc) (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
+    Format.printf "%s %a@." (Cavertex.pprint cloc) (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
   ) ca
 
 (* sequential (atomic) abstract execution {{{ *)
@@ -208,16 +209,16 @@ let absv_rel man env absv (expr, highest_prime) =
 let do_abstract_computation man env abs_map cfg =
   let vars, _ = Environment.vars env in
   let abs_map = ref abs_map in
-  let prev_abs_map = ref AbsMap.empty in
+  let prev_abs_map = ref VertexMap.empty in
   try begin
     while not (abs_map_equal man !abs_map !prev_abs_map) do
       prev_abs_map := !abs_map ;
       abs_map := G.fold_vertex (fun vertex map ->
         let incoming_absv = G.fold_pred_e (fun (fvertex, (stmts, _), _) l ->
-          let absv_fploc = AbsMap.find fvertex !abs_map in
+          let absv_fploc = VertexMap.find fvertex !abs_map in
           (absv_seq man env absv_fploc stmts) :: l
         ) cfg vertex [] in
-        let absv_list = (AbsMap.find vertex !abs_map) :: incoming_absv in
+        let absv_list = (VertexMap.find vertex !abs_map) :: incoming_absv in
         let absv = Abstract1.join_array man (Array.of_list absv_list) in
         let widened_itvl_array = Array.map (fun var ->
           let itvl = Abstract1.bound_variable man absv var in
@@ -226,14 +227,14 @@ let do_abstract_computation man env abs_map cfg =
         ) vars
         in
         let widened_absv = Abstract1.of_box man env vars widened_itvl_array in
-        AbsMap.add vertex widened_absv map
+        VertexMap.add vertex widened_absv map
       ) cfg !abs_map
     done ;
     man, env, !abs_map
   end
   with Manager.Error e -> Printf.eprintf "ERROR: %s; %s\n" e.Apron.Manager.msg (Manager.string_of_funid e.Apron.Manager.funid) ; raise (Manager.Error e)
 
-let do_abstract_computation_initial_values init_clocs vars cfg =
+let do_abstract_computation_initial_values init_ca_locs_with_constraints vars cfg =
   (* let pprint_constr = List.iter (fun (var, itvl) -> *)
   (*   Format.printf "%s |-> %a@." var Interval.print itvl *)
   (* ) in *)
@@ -250,19 +251,19 @@ let do_abstract_computation_initial_values init_clocs vars cfg =
   let vars, _ = Environment.vars env in
   let init_interval constr = Array.map (fun v ->
     let var_name = Var.to_string v in
-    let init_value = List.assoc_opt var_name constr in
+    let init_value = Cavertex.VariableMap.find_opt var_name constr in
     match init_value with
     | Some i -> i
     | None -> Interval.top
   ) vars in
   let abs_map = G.fold_vertex (fun current_cloc map ->
-    let init_heap = List.find_opt (fun (init_cloc, _) -> cloc_equal current_cloc init_cloc) init_clocs in
+    let init_heap = List.find_opt (fun (init_cloc, _) -> Cavertex.equal current_cloc init_cloc) init_ca_locs_with_constraints in
     let absv = match init_heap with (* check if cloc is an initial vertex *)
     | Some (_, itvl) -> Abstract1.of_box man env vars (init_interval itvl)
     | None -> Abstract1.bottom man env
     in
-    AbsMap.add current_cloc absv map
-  ) cfg AbsMap.empty
+    VertexMap.add current_cloc absv map
+  ) cfg VertexMap.empty
   in
   do_abstract_computation man env abs_map cfg
 
@@ -271,7 +272,7 @@ let do_abstract_computation_initial_values init_clocs vars cfg =
 let remove_infeasible man env abs_map cfg =
   G.fold_edges_e (fun e (acc_g,acc_removed) ->
     let fvertex, (stmts, _), _ = e in
-    let absv  = AbsMap.find fvertex abs_map in
+    let absv  = VertexMap.find fvertex abs_map in
     let absv' = absv_seq man env absv stmts in
     if Abstract1.is_bottom man absv' then
       acc_g, acc_removed+1
