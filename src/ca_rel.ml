@@ -57,9 +57,6 @@ module G = Scfg.G(struct
   let compare_edge_label (e1,_) (e2,_) = Expr.compare e1 e2
   let equal_edge_label   (e1,_) (e2,_) = Expr.equal e1 e2
   let default_edge_label               = Boolean.mk_true (mk_context []), 0
-  let pprint_edge_label (e,_) = Expr.to_string e
-
-  let color_edge _  = 0
 end)
 
 (* }}} *)

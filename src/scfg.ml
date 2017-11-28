@@ -15,9 +15,6 @@ module type GConfig = sig
   val compare_edge_label : edge_label -> edge_label -> int
   val equal_edge_label   : edge_label -> edge_label -> bool
   val default_edge_label : edge_label
-  val pprint_edge_label  : edge_label -> string
-
-  val color_edge        : edge_label -> Graphviz.color
 end
 
 type edge_kind = E of string | S of string
@@ -26,6 +23,13 @@ let pprint_edge_kind = function
   | S id -> Printf.sprintf "Summary %s" id
 let effect_ID_name = "ID"
 let effect_ID = E effect_ID_name
+
+module type Dotable = sig
+  type edge
+
+  val color_edge : edge_kind -> Graphviz.color
+  val pprint_edge_label : edge -> string
+end
 
 module G (C:GConfig) = struct
   module V_ = struct
@@ -52,7 +56,8 @@ module G (C:GConfig) = struct
 
   module Imp = Imperative.Digraph.ConcreteBidirectionalLabeled(V_)(E_)
 
-  module Dot = Graphviz.Dot (struct
+  module Dot (X:Dotable with type edge = E.t) = struct
+    include Graphviz.Dot (struct
     include G_
     let graph_attributes _ = []
     let default_vertex_attributes _ = [`Regular false]
@@ -61,9 +66,9 @@ module G (C:GConfig) = struct
     let get_subgraph _ = None
     let default_edge_attributes _ = []
     let edge_attributes (v,(e,ek),v') = [
-      `Label (C.pprint_edge_label e) ;
-      `Color (C.color_edge e) ;
-      `Fontcolor (C.color_edge e)
+        `Label (X.pprint_edge_label (v,(e,ek),v')) ;
+        `Color (X.color_edge ek) ;
+        `Fontcolor (X.color_edge ek)
     ]
   end)
 

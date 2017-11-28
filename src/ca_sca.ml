@@ -36,9 +36,6 @@ module G = Scfg.G(struct
   let compare_edge_label = VariableMap.compare Pervasives.compare
   let equal_edge_label   = VariableMap.equal Pervasives.(=)
   let default_edge_label = VariableMap.empty
-  let pprint_edge_label  = pprint_transition
-
-  let color_edge _  = 0
 end)
 
 (* }}} *)
