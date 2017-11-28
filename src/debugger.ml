@@ -23,7 +23,7 @@ let current_components : component list ref = ref []
 
 let logf lvl component =
   if List.mem component !current_components && ord lvl >= ord !current_level then (
-    printf "[%s] " (string_of_lvl !current_level) ;
+    printf "[%s] " (string_of_lvl lvl) ;
     printf
   ) else ifprintf stdout
 
