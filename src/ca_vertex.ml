@@ -99,7 +99,7 @@ module Vertex = struct
   let equal_vertex   = equal
   let get_ploc (p,_) = p
 
-  let pprint_vertex v = pprint v
+  let pprint_vertex v = Printf.sprintf "\"%s\"" (pprint v)
 end
 
 (* }}} *)
