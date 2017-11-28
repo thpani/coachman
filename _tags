@@ -1,1 +1,1 @@
-true: package(ocamlgraph), package(str), package(apron), package(apron.boxMPQ), package(Z3)
+true: package(ocamlgraph), package(str), package(apron), package(apron.boxMPQ), package(z3)
