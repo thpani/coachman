@@ -58,25 +58,33 @@ module G (C:GConfig) = struct
 
   module Dot (X:Dotable with type edge = E.t) = struct
     include Graphviz.Dot (struct
-    include G_
-    let graph_attributes _ = []
-    let default_vertex_attributes _ = [`Regular false]
-    let vertex_name v = C.pprint_vertex v
-    let vertex_attributes _ = []
-    let get_subgraph _ = None
-    let default_edge_attributes _ = []
-    let edge_attributes (v,(e,ek),v') = [
+      include G_
+      let graph_attributes _ = []
+      let default_vertex_attributes _ = [`Regular false]
+      let vertex_name v = C.pprint_vertex v
+      let vertex_attributes _ = []
+      let get_subgraph _ = None
+      let default_edge_attributes _ = []
+      let edge_attributes (v,(e,ek),v') = [
         `Label (X.pprint_edge_label (v,(e,ek),v')) ;
         `Color (X.color_edge ek) ;
         `Fontcolor (X.color_edge ek)
-    ]
-  end)
+      ]
+    end)
+
+    let write_dot g basename component =
+      let path = Printf.sprintf "%s_%s.dot" basename component in
+      let chout = open_out path in
+      output_graph chout g ; close_out chout
+  end
 
   let pprint_cfg_edge (v,(l,et),v') = Printf.sprintf "%s: %d -> %d"
     (pprint_edge_kind et) (C.get_ploc v) (C.get_ploc v')
 
   let pprint_edge (v,(l,et),v') = Printf.sprintf "%s: %s -> %s"
     (pprint_cfg_edge (v,(l,et),v')) (C.pprint_vertex v) (C.pprint_vertex v')
+
+  let pprint_stats g = Printf.sprintf "|V| = %d, |E| = %d" (nb_vertex g) (nb_edges g)
 
   let equal_edge_ignore_labels (c1,et1,c1') (c2,(_,et2),c2') =
     C.equal_vertex c1 c2 && C.equal_vertex c1' c2' && et1 = et2
@@ -110,6 +118,11 @@ module G (C:GConfig) = struct
         scc_vertex_outgoing_edges_in_scc @ l
       ) [] scc_vertices
     ) scc_list
+
+  let sccs g =
+    List.map (fun scc_edges ->
+      List.fold_left (fun g edge -> add_edge_e g edge) empty scc_edges
+    ) (scc_edges g)
 
   let edge_in_scc edge scc =
     let g = List.fold_left add_edge_e empty scc in
