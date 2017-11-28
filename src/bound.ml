@@ -83,17 +83,20 @@ let pprint_bound = function
   | Bound e -> Z3.Expr.to_string (Z3.Expr.simplify e None)
   | Unbounded -> "∞"
 
-let get_local_bounds vars ca =
+let get_local_bounds ctx vars ca_seq =
   let open Ca_vertex in
-  let sccs = Ca_sca.G.scc_edges ca in
-  let local_bounds = List.map (fun scc ->
+  let sccs = Ca_seq.G.sccs ca_seq in
+  let local_bounds = List.map (fun scc_seq ->
+    let scc_seq = Ca_seq.propagate_equalities scc_seq in
+    let scc_sca = Ca_sca.of_seq ctx vars scc_seq in
+    let scc_sca_edges = Ca_sca.G.fold_edges_e List.cons scc_sca [] in
     let var_edge_map = VariableSet.fold (fun var map ->
       let edges_ranked_by_var = List.filter (fun edge -> (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
         let _,(dc,_),_ = edge in
         let decreases_on_edge = (VariableMap.find var dc) = Ca_sca.Strict in
-        let increases_in_scc = List.fold_left (fun b (_,(dc,_),_) -> b || ((VariableMap.find var dc) = Ca_sca.DontKnow)) false scc in
+        let increases_in_scc = List.fold_left (fun b (_,(dc,_),_) -> b || ((VariableMap.find var dc) = Ca_sca.DontKnow)) false scc_sca_edges in
         decreases_on_edge && (not increases_in_scc)
-      ) scc in
+      ) scc_sca_edges in
       VariableMap.add var edges_ranked_by_var map
     ) vars VariableMap.empty in
     (* VariableMap.iter (fun var edges_ranked_by_var -> *)
@@ -101,7 +104,7 @@ let get_local_bounds vars ca =
     (*   List.iter (fun edge -> Printf.printf "  %s" (pprint_edge edge)) edges_ranked_by_var *)
     (* ) var_edge_map ; *)
     List.map (fun edge ->
-      (* Debugger.debug "local_bound" "  Edge %s " (Ca_sca.G.pprint_edge edge) ; *)
+      Debugger.debug "local_bound" "  Edge %s " (Ca_sca.G.pprint_edge edge) ;
       (* (2) Let v ∈ V. We define ξ(v) ⊆ E to be the set of all transitions τ = l1 → l2 ∈ E such that v' ≤ v + c ∈ u for some c < 0. For all τ ∈ ξ(v) we set ζ(τ) = v. *)
       let local_bound =
         let ranking_vars = VariableSet.filter (fun var ->
@@ -116,7 +119,7 @@ let get_local_bounds vars ca =
             let scc_without_edges_ranked_by_var = List.filter (fun edge ->
               let is_edge_ranked_by_var = List.exists (Ca_sca.G.equal_edge edge) edges_ranked_by_var in
               not is_edge_ranked_by_var
-            ) scc in
+            ) scc_sca_edges in
             let var_breaks_scc = not (Ca_sca.G.edge_in_scc edge scc_without_edges_ranked_by_var) in
             var_breaks_scc
           ) vars in
@@ -124,25 +127,26 @@ let get_local_bounds vars ca =
             Debugger.debug "local_bound" "Unbounded.\n" ;
             Candidate.Unbounded
           end else begin
-            (* Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (Ca_vertex.VariableSet.to_string ranking_vars) ; *)
+            Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (Util.DS.IdentifierSet.pprint ranking_vars) ;
             Candidate.Var ranking_vars
           end
         end else begin
-          (* Debugger.debug "local_bound" "ranked by %s.\n" (Ca_vertex.VariableSet.to_string ranking_vars) ; *)
+          Debugger.debug "local_bound" "ranked by %s.\n" (Util.DS.IdentifierSet.pprint ranking_vars) ;
           Candidate.Var ranking_vars
         end
-      in edge, local_bound
-    ) scc
+      in
+      let (f,_),_,(t,_) = edge in
+      (f,t), local_bound
+    ) scc_sca_edges
   ) sccs in
   let local_bounds = List.concat local_bounds in
-  Ca_sca.G.fold_edges_e (fun edge l ->
-    let (f,_),_,(t,_) = edge in
-    let local_bound = match List.assoc_opt edge local_bounds with
+  Ca_seq.G.fold_edges_e (fun ((f,_),_,(t,_)) l ->
+    let local_bound = match List.assoc_opt (f,t) local_bounds with
     | Some lb -> lb
     | None -> Candidate.Const 1
     in
     ((f,t),local_bound) :: l
-  ) ca []
+  ) ca_seq []
 
 let summary_ctr summary_name = Printf.sprintf "summary_ctr_%s" summary_name
 let is_summary_ctr id = Str.string_match (Str.regexp "^summary_ctr_\\(.*\\)") id 0
@@ -285,7 +289,7 @@ let refine_ca_with_env_bounds ca env_bound_map =
     Ca_seq.G.add_edge_e ca_rel edge'
   ) ca Ca_seq.G.empty
 
-let refine_ca_rel_abstract_with_env_bounds ca_rel_abstract env_bound_map =
+let refine_ca_sca_with_env_bounds ca_sca env_bound_map =
   let env_bound_constr edge_type = EnvBoundMap.fold (fun summary_name bound result ->
     let bound = EnvBoundMap.find summary_name env_bound_map in
     let sca_op = match bound with
@@ -300,7 +304,7 @@ let refine_ca_rel_abstract_with_env_bounds ca_rel_abstract env_bound_map =
     let dc' = VariableMap.union (fun _ refined _ -> Some refined) (env_bound_constr edge_type) dc in
     let edge' = (from, (dc', edge_type), to_) in
     G.add_edge_e ca_rel edge'
-  ) ca_rel_abstract G.empty
+  ) ca_sca G.empty
 
 module CfgEdge = struct
   type t = Cfg.G.vertex * Scfg.edge_kind * Cfg.G.vertex
@@ -314,8 +318,27 @@ let print_edge_bound_map =
     Printf.printf "%s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,([],et),t)) (pprint_bound_asymp local_bounds) (pprint_bound local_bounds)
 )
 
-let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
+let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_loc, constraints) =
   Printf.printf "# Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
+
+  (* setup dot output *)
+  let dot_basename = Printf.sprintf "%s_heap%d" dot_basename i in
+  (* let dot_basename = dot_basename^(Ca_vertex.pprint_structure (snd init_ca_loc)) in *)
+  let module Ca_seqDot = Ca_seq.G.Dot (struct
+    type edge = Ca_seq.G.E.t
+    let color_edge = get_edge_color
+    let pprint_edge_label (f,(stmts,e),t) = Printf.sprintf "%s\n%s" (Ca_seq.pprint_seq stmts) (Scfg.pprint_edge_kind e)
+  end) in
+  let module Ca_relDot = Ca_rel.G.Dot (struct
+    type edge = Ca_rel.G.E.t
+    let color_edge = get_edge_color
+    let pprint_edge_label (f,(trel,e),t) = Printf.sprintf "%s\n%s" (Ca_rel.pprint_transrel trel) (Scfg.pprint_edge_kind e)
+  end) in
+  let module Ca_scaDot = Ca_sca.G.Dot (struct
+    type edge = Ca_sca.G.E.t
+    let color_edge = get_edge_color
+    let pprint_edge_label (f,(trel,e),t) = Printf.sprintf "%s\n%s" (Ca_sca.pprint_transition trel) (Scfg.pprint_edge_kind e)
+  end) in
 
   (* Get lists of summary, effect names from CFG *)
   let summaries, effects = Cfg.G.fold_edges_e (fun (_,(_,summary_ref),_) (summaries, effects) ->
@@ -336,49 +359,53 @@ let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
 
   (* Build CA from CFG *)
   Debugger.debug "bound" "Building counter automaton from CFG...\n%!" ;
-  let ca = Ca_seq.from_cfg cfg init_ca_loc in
+  let ca_seq = Ca_seq.from_cfg cfg init_ca_loc in
+  let ca_seq = Ca_seq.propagate_equalities ca_seq in
 
   (* Set of variables over which the CA is defined *)
   let vars =
-    let ca_vars = VariableSet.of_list (Ca_seq.collect_vars ca) in
+    let ca_vars = VariableSet.of_list (Ca_seq.collect_vars ca_seq) in
     let summary_vars = VariableSet.map summary_ctr summaries in
     VariableSet.union ca_vars summary_vars
   in
 
   (* For bounded CA summary edges, add decrement statement of the summary_counter *)
-  let ca = refine_ca_with_env_bounds ca !env_bound_map in
+  let ca_seq = refine_ca_with_env_bounds ca_seq !env_bound_map in
   (* For bounded CA summary edges, refine constraints on initial states, i.e., on summary counters *)
   let refined_constraints = refine_init_constraints_with_env_bounds constraints !env_bound_map in
 
   (* Run interval abstract domain on CA and initial state constraints, to prune infeasible edges. *)
   Debugger.debug "bound" "Removing infeasible edges in CA... %!" ;
-  let man, env, abs_map = Ai.do_abstract_computation_initial_values init_ca_loc refined_constraints (VariableSet.elements vars) ca in
-  let ca, num_inf = Ai.remove_infeasible man env abs_map ca in
+  let man, env, abs_map = Ai.do_abstract_computation_initial_values init_ca_loc refined_constraints (VariableSet.elements vars) ca_seq in
+  let ca_pruned, num_inf = Ai.remove_infeasible man env abs_map ca_seq init_ca_loc in
   Debugger.debug "bound" "%d pruned\n%!" num_inf ;
 
-  (* let scc_g = Ca_seq.G.scc_of_cfg_edge ca 11 0 (Scfg.E "deq_swing") in *)
-  (* CaDot.write_dot scc_g "scc" "" ; *)
+  let scc_seq = Ca_seq.G.scc_of_cfg_edge ca_pruned 11 0 (Scfg.E "deq_swing") in
+  let scc_seq = Ca_seq.propagate_equalities scc_seq in
+  let scc_rel = Ca_rel.of_seq ctx scc_seq in
+  let scc_sca = Ca_sca.of_rel ctx vars scc_rel in
+  Ca_seqDot.write_dot scc_seq dot_basename "scc_seq" ;
+  Ca_relDot.write_dot scc_rel dot_basename "scc_rel" ;
+  Ca_scaDot.write_dot scc_sca dot_basename "scc_sca" ;
 
-  (* Compute CA with transition relations *)
-  Debugger.debug "bound" "Computing relational CA...\n%!" ;
-  let ca_rel = Ca_rel.of_seq ctx ca in
-  (* Ca_rel.Concrete.Dot.write_dot ca_rel "ca_rel.dot" ; *)
-
-  (* Compute CA with SCA transition relations *)
-  Debugger.debug "bound" "Computing SCA CA...\n%!" ;
-  let ca_rel_abstract = Ca_sca.of_concrete ctx vars ca_rel in
-  let ca_rel_abstract = ref ca_rel_abstract in
+  let ca_rel = Ca_rel.of_seq ctx ca_pruned in
+  let ca_sca = Ca_sca.of_rel ctx vars ca_rel in
+  Ca_seqDot.write_dot ca_pruned dot_basename "seq" ;
+  Ca_relDot.write_dot ca_rel dot_basename "rel" ;
+  Ca_scaDot.write_dot ca_sca dot_basename "sca" ;
+  Debugger.info "stats" "CFG: %s, CA: %s, CA (pruned): %s, CA_rel: %s, CA_sca: %s\n" (Cfg.G.pprint_stats cfg) (Ca_seq.G.pprint_stats ca_seq) (Ca_seq.G.pprint_stats ca_pruned) (Ca_rel.G.pprint_stats ca_rel) (Ca_sca.G.pprint_stats ca_sca) ;
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
 
   let cfg_scc_edges = List.concat (Cfg.G.scc_edges cfg) in
 
+  let ca = ref ca_pruned in
   let iteration = ref 1 in
   let result = ref CfgEdgeMap.empty in
   while !iteration > 0 do
-    Debugger.debug "bound" "= Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map !env_bound_map) ;
+    Printf.printf "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map !env_bound_map) ;
 
-    let ca_local_bound_map = get_local_bounds vars !ca_rel_abstract in
+    let ca_local_bound_map = get_local_bounds ctx vars !ca in
     let get_ca_local_bounds f t = List.fold_left (fun l ((f',t'),lb) ->
       if f'=f && t'=t then lb :: l else l
     ) [] ca_local_bound_map in
@@ -448,8 +475,8 @@ let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
     if env_bound_map_changed then (
       iteration := !iteration + 1 ;
       env_bound_map := env_bound_map' ;
-      ca_rel_abstract := refine_ca_rel_abstract_with_env_bounds !ca_rel_abstract env_bound_map' ;
-      (* Ca_rel.Abstract.Dot.write_dot !ca_rel_abstract "rel_abstr.dot" ; *)
+      ca := refine_ca_with_env_bounds !ca env_bound_map' ;
+      (* Ca_rel.Abstract.Dot.write_dot !ca_sca "rel_abstr.dot" ; *)
     ) else (
       (* quit the loop *)
       iteration := 0;
@@ -457,15 +484,6 @@ let compute_bound_for_init_heap ctx cfg (init_ca_loc, constraints) =
 
       (* print_edge_bound_map edge_bound_map ; *)
       (* print_newline () ; *)
-
-      (* write cfg w/ bounds to file file *)
-      (* let module CfgDot = Cfg.Dot (struct *)
-      (*   let get_color (_,(_,et),_) = get_color et *)
-      (*   let get_label (f,(stmts,e),t) = *) 
-      (*     let bound = List.assoc (f,e,t) edge_bound_map in *)
-      (*     Printf.sprintf "%s\n%s\n%s" (pprint_bound_asymp bound) (pprint_bound bound) (Cfg.pprint_seq stmts) *)
-      (* end) in *)
-      (* CfgDot.write_dot cfg_not_precompiled dot_basename "cfg_bounded" ; *)
     )
   done ;
   !result
@@ -479,15 +497,12 @@ let maxbound ctx a b =
   let ngt0 = Arithmetic.mk_gt ctx (Z3.mk_const ctx "N") (Z3.mk_numeral ctx 0) in
   let ageb = Arithmetic.mk_ge ctx a b in
   let bgea = Arithmetic.mk_ge ctx b a in
-  let sat_problem = Boolean.mk_not ctx (Boolean.mk_implies ctx ngt0 ageb) in
-  match Z3.check ctx sat_problem with
-  | Solver.UNSATISFIABLE -> a
-  | _ -> (
-    let sat_problem = Boolean.mk_not ctx (Boolean.mk_implies ctx ngt0 bgea) in
-    match Z3.check ctx sat_problem with
-    | Solver.UNSATISFIABLE -> b
-    | _ -> Boolean.mk_ite ctx (Arithmetic.mk_gt ctx a b) a b
-  )
+  if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 ageb) then
+    a
+  else if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 bgea) then
+    b
+  else
+    Boolean.mk_ite ctx (Arithmetic.mk_gt ctx a b) a b
 
 (** Map any edge to [0] (black). *)
 let def_get_color _ = 0
@@ -503,7 +518,7 @@ let compute_bounds ?(dot_basename="") ?(get_edge_color=def_get_color) init_ca_lo
   let ctx = Z3.mk_context [] in
 
   (* Compute bounds for CFG edges per initial heap *)
-  let bounds_per_init_heap = List.map (compute_bound_for_init_heap ctx cfg) init_ca_locs_with_constraints in
+  let bounds_per_init_heap = List.mapi (compute_bound_for_init_heap dot_basename get_edge_color ctx cfg) init_ca_locs_with_constraints in
 
   (* For each initial heap, select max bound for each CFG edge *)
   let edge_bound_map = Cfg.G.fold_edges_e (fun (f,(_,et),t) edge_bound_map ->
@@ -518,4 +533,14 @@ let compute_bounds ?(dot_basename="") ?(get_edge_color=def_get_color) init_ca_lo
     CfgEdgeMap.add e max_bound edge_bound_map
   ) cfg CfgEdgeMap.empty in
 
-  print_edge_bound_map edge_bound_map
+  print_edge_bound_map edge_bound_map ;
+
+  (* write cfg w/ bounds to file file *)
+  let module CfgDot = Cfg.G.Dot (struct
+    type edge = Cfg.G.E.t
+    let color_edge = get_edge_color
+    let pprint_edge_label (f,(stmts,e),t) = 
+      let bound = CfgEdgeMap.find (f,e,t) edge_bound_map in
+      Printf.sprintf "%s\n%s\n%s\n%s" (pprint_bound_asymp bound) (pprint_bound bound) (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
+  end) in
+  CfgDot.write_dot cfg_not_precompiled dot_basename "cfg_bounded" ;

@@ -70,11 +70,15 @@ let abstract_vars ctx transrel highest_prime vars =
   ) vars IdentifierMap.empty
 
 (** [of_concrete ctx vars ca_rel] abstracts a CA with relational edge labels [ca_rel] over variables [vars] into a size-change system. *)
-let of_concrete ctx vars ca_rel =
-  let ca_rel_abstract = Ca_rel.G.fold_edges_e (fun (from, ((transrel, highest_prime), summary), to_) ca_rel ->
+let of_rel ctx vars ca_rel =
+  Ca_rel.G.fold_edges_e (fun (from, ((transrel, highest_prime), summary), to_) ca_rel ->
     let diff_constr = abstract_vars ctx transrel highest_prime vars in
     G.add_edge_e ca_rel (from, (diff_constr, summary), to_)
-  ) ca_rel G.empty in
-  ca_rel_abstract
+  ) ca_rel G.empty
+
+(** [of_seq ctx vars ca_seq] abstracts a CA with statement edge labels [ca_seq] over variables [vars] into a size-change system. *)
+let of_seq ctx vars ca_seq =
+  let ca_rel = Ca_rel.of_seq ctx ca_seq in
+  of_rel ctx vars ca_rel
 
 (* }}} *)
