@@ -270,8 +270,8 @@ let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
 
 (* }}} *)
 
-let remove_infeasible man env abs_map cfg =
-  G.fold_edges_e (fun e (acc_g,acc_removed) ->
+let remove_infeasible man env abs_map cfg initv =
+  let g_wo_inf_edges, num_inf = G.fold_edges_e (fun e (acc_g,acc_removed) ->
     let fvertex, (stmts, _), _ = e in
     let absv  = VertexMap.find fvertex abs_map in
     let absv' = absv_seq man env absv stmts in
@@ -279,4 +279,5 @@ let remove_infeasible man env abs_map cfg =
       acc_g, acc_removed+1
     else
       G.add_edge_e acc_g e, acc_removed
-  ) cfg (G.empty, 0)
+  ) cfg (G.empty, 0) in
+  G.remove_unreachable g_wo_inf_edges initv, num_inf

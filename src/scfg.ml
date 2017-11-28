@@ -79,6 +79,17 @@ module G (C:GConfig) = struct
   let equal_edge (c1,(l1,et1),c1') (c2,(l2,et2),c2') =
     C.equal_vertex c1 c2 && C.equal_vertex c1' c2' && C.equal_edge_label l1 l2 && et1 = et2
 
+  let remove_unreachable g initv =
+    let module PathChecker = Graph.Path.Check(G_) in
+    fold_vertex (fun v g ->
+      if PathChecker.check_path (PathChecker.create g) initv v then g else remove_vertex g v
+    ) g g
+
+  let of_imp g = Imp.fold_edges_e (fun edge acc_g -> add_edge_e acc_g edge) g empty
+  let imp_of_perv g = 
+    let g' = Imp.create () in
+    iter_edges_e (fun edge -> Imp.add_edge_e g' edge) g ; g'
+
   let scc_edges g = 
     let scc_list = scc_list g in
     List.map (fun scc_vertices ->

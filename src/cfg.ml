@@ -289,12 +289,7 @@ let from_ast ast =
     )
     | _ -> () (* not a single successor reachable via assume stmt *)
   ) g ;
-  (* Remove unreachable vertices *)
-  let module PathChecker = Graph.Path.Check(G.Imp) in
-  G.Imp.iter_vertex (fun v ->
-    if not (PathChecker.check_path (PathChecker.create g) 0 v) then G.Imp.remove_vertex g v
-  ) g ;
-  G.Imp.fold_edges_e (fun edge acc_g -> G.add_edge_e acc_g edge) g G.empty
+  G.remove_unreachable (G.of_imp g) 0
 
 (* }}} *)
 
