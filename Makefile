@@ -28,7 +28,8 @@ doc:
 test: $(TREIBER) $(MS)
 
 testclean:
-	rm test/e2e/*/*.dot test/e2e/*/*.pdf
+	$(MAKE) -C test/e2e/treiber clean
+	$(MAKE) -C test/e2e/ms clean
 
 $(TREIBER): native
 	@$(MAKE) -C test/e2e/treiber $(patsubst _%,%,$(patsubst testt%,%,$@))

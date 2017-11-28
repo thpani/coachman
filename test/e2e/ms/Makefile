@@ -1,8 +1,11 @@
-.PHONY: all emp emp_nolag deq deq_nolag enq enq_nolag
+.PHONY: all clean emp emp_nolag deq deq_nolag enq enq_nolag
 
 BIN = ../../../main.native
 
 all: emp emp_nolag deq deq_nolag enq enq_nolag
+
+clean:
+	rm -f *.dot *.pdf
 
 emp:
 	$(BIN) ms.tiny ms.heap ../empty.summaries

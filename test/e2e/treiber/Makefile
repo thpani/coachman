@@ -1,8 +1,11 @@
-.PHONY: all emp pop push
+.PHONY: all clean emp pop push
 
 BIN = ../../../main.native
 
 all: emp pop push
+
+clean:
+	rm -f *.dot *.pdf
 
 emp:
 	$(BIN) treiber.tiny treiber.heap ../empty.summaries
