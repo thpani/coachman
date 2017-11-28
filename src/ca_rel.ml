@@ -8,6 +8,12 @@ type transrel = Expr.expr * highest_prime
 
 (* }}} *)
 
+(* pretty printing functions {{{ *)
+
+let pprint_transrel (e,_) = Expr.to_string e
+
+(* }}} *)
+
 (* statements to transition relations {{{ *)
 
 let identity_rel ctx num_prime vars =
