@@ -423,3 +423,39 @@ let collect_vars cfg =
   let vars_edge = G.fold_edges_e (fun (_, (stmts, _), _) l -> (collect_vars_seq stmts) @ l) cfg [] in
   let id_list = List.sort_uniq Pervasives.compare (vars_vertex @ vars_edge) in
   id_list
+
+
+let propagate_equalities ca =
+  let ca' = G.imp_of_perv ca in
+  let q = Queue.create () in
+  G.Imp.iter_vertex (fun v -> Queue.add v q) ca' ;
+  while not (Queue.is_empty q) do
+    let v = Queue.pop q in
+    let pred_stmt = List.map (fun (_,(stmt,_),_) -> stmt) (G.Imp.pred_e ca' v) in
+    let stmt_to_propagate = match pred_stmt with
+    | stmt :: tl -> ( match stmt with
+      | [ Asgn (id, Id id2) ] -> if List.for_all ((=) stmt) tl then Some stmt else None
+      | _ -> None
+    )
+    | [] -> None
+    in
+    match stmt_to_propagate with
+    | Some [ stmt_prop ] ->
+        Debugger.debug "propagate_eq" "%s %s\n" (Ca_vertex.pprint v) (pprint_stmt stmt_prop) ;
+        G.Imp.iter_succ_e (fun edge ->
+          let (_,(stmt,ek),v') = edge in
+          if (List.hd stmt) <> stmt_prop then begin
+            let stmt' = match stmt with
+              | [ Assume True ] -> [ stmt_prop ]
+              | _ -> stmt_prop :: stmt
+            in
+            let edge' = v,(stmt',ek),v' in
+            G.Imp.remove_edge_e ca' edge ;
+            G.Imp.add_edge_e ca' edge' ;
+            Debugger.debug "propagate_eq" "  %s\n    %s\n" (G.pprint_edge edge') (pprint_seq ~sep:"; " stmt') ;
+            Queue.add v' q
+          end
+        ) ca' v
+    | _ -> ()
+  done ;
+  G.of_imp ca'
