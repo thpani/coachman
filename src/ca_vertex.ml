@@ -39,7 +39,8 @@ type ca_loc = ploc * structure
 
 (* equal / compare / hash {{{ *)
 
-(* TODO can we use polymorphic compare / equal / hash here? *)
+(* Caveat: we cannot use polymorphic compare / equal / hash here:
+ * https://blog.janestreet.com/the-perils-of-polymorphic-compare/ *)
 let compare (loc,s) (loc',s') = match Pervasives.compare loc loc' with
 | 0 -> begin match NodeSet.compare s.nodes s'.nodes with
   | 0 -> begin match NodeMap.compare Node.compare s.succ s'.succ with
