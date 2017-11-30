@@ -44,23 +44,24 @@ end)
 
 (** [abstract ctx transrel highest_prime var] returns a size-change operator [op] if [var' op var] is implied by [transrel]. [transrel] ranges over vars with highest prime [highest_prime]. *)
 let abstract ctx transrel highest_prime var =
-    let s = Solver.mk_solver ctx None in
-    let c = mk_const ctx var in
-    let c' = mk_const' ctx highest_prime var in
-    let constr = Arithmetic.mk_lt ctx c' c in
+  let qf_lia = Z3.Symbol.mk_string ctx "QF_LIA" in
+  let s = Solver.mk_solver ctx (Some qf_lia) in
+  let c = mk_const ctx var in
+  let c' = mk_const' ctx highest_prime var in
+  let constr = Arithmetic.mk_lt ctx c' c in
+  let impl = Boolean.mk_implies ctx transrel constr in
+  let sat_problem = Boolean.mk_not ctx impl in
+  Solver.add s [ sat_problem ] ;
+  match Solver.check s [] with
+  | Solver.UNSATISFIABLE -> Strict
+  | _ ->
+    let constr = Arithmetic.mk_le ctx c' c in
     let impl = Boolean.mk_implies ctx transrel constr in
     let sat_problem = Boolean.mk_not ctx impl in
     Solver.add s [ sat_problem ] ;
     match Solver.check s [] with
-    | Solver.UNSATISFIABLE -> Strict
-    | _ ->
-      let constr = Arithmetic.mk_le ctx c' c in
-      let impl = Boolean.mk_implies ctx transrel constr in
-      let sat_problem = Boolean.mk_not ctx impl in
-      Solver.add s [ sat_problem ] ;
-      match Solver.check s [] with
-      | Solver.UNSATISFIABLE -> NonStrict
-      | _ -> DontKnow
+    | Solver.UNSATISFIABLE -> NonStrict
+    | _ -> DontKnow
 
 (** [abstract_vars ctx transrel highest_prime vars] returns a map from variables [vars] to size-change predicates implied by transition relations [transrel]. [transrel] ranges over vars with highest prime [highest_prime]. *)
 let abstract_vars ctx transrel highest_prime vars =

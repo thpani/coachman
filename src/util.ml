@@ -16,6 +16,8 @@ end
 module Z3 = struct
   include Z3
 
+  let qf_lia ctx = Z3.Symbol.mk_string ctx "QF_LIA"
+
   let int_sort = Arithmetic.Integer.mk_sort
 
   (** [mk_numeral ctx n] makes a numeral of value [n]. *)
@@ -32,7 +34,7 @@ module Z3 = struct
   (** [check ctx f] checks [f] for validity. *)
   let check_valid ctx f =
     let sat_problem = Boolean.mk_not ctx f in
-    let s = Solver.mk_solver ctx None in
+    let s = Solver.mk_solver ctx (Some (qf_lia ctx)) in
     Solver.add s [ sat_problem ] ;
     (Solver.check s []) = Solver.UNSATISFIABLE
 end
