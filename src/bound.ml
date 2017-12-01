@@ -11,21 +11,56 @@ type var_abs_map = Apron.Interval.t VariableMap.t
 type ca_loc_with_constraints = Ca_vertex.ca_loc * var_abs_map
 
 module Candidate = struct
-  type bound = Const of int | Var of VariableSet.t | Unbounded
-
-  let pprint_bound = function 
-    | Const i -> string_of_int i
-    | Var l -> VariableSet.pprint l
-    | Unbounded -> "∞"
-  let pprint_bound_factor factor = function
-    | Const 0 -> "0"
-    | Const 1 -> factor
-    | Unbounded -> "∞"
-    | bound ->  Printf.sprintf "%s × (%s)" (pprint_bound bound) factor
+  type bound = Const of int | Var of VariableSet.t * int option VariableMap.t | Unbounded
 end
 
-
 type bound = Bound of Z3.Expr.expr | Unbounded
+
+let const_bound ctx i = Bound (Util.Z3.mk_numeral ctx i)
+let const_bound_0 ctx = const_bound ctx 0
+let const_bound_1 ctx = const_bound ctx 1
+
+(* Simplify max expressions so we don't have lots of its in the bound expression *)
+let max_expr ctx a b =
+  let open Z3 in
+  let ngt0 = Arithmetic.mk_gt ctx (Z3.mk_const ctx "N") (Z3.mk_numeral ctx 1) in
+  let ageb = Arithmetic.mk_ge ctx a b in
+  let bgea = Arithmetic.mk_ge ctx b a in
+  if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 ageb) then
+    a
+  else if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 bgea) then
+    b
+  else
+    Boolean.mk_ite ctx (Arithmetic.mk_gt ctx a b) a b
+
+let min_expr ctx a b =
+  let open Z3 in
+  let ngt0 = Arithmetic.mk_gt ctx (Z3.mk_const ctx "N") (Z3.mk_numeral ctx 1) in
+  let ageb = Arithmetic.mk_ge ctx a b in
+  let bgea = Arithmetic.mk_ge ctx b a in
+  if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 ageb) then
+    b
+  else if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 bgea) then
+    a
+  else
+    Boolean.mk_ite ctx (Arithmetic.mk_gt ctx a b) b a
+
+let max_bound ctx =
+  List.fold_left (fun max_bound bound ->
+    match (max_bound, bound) with
+    | Unbounded, _         -> Unbounded
+    |         _, Unbounded -> Unbounded
+    | Bound e1, Bound e2 -> Bound (max_expr ctx e1 e2)
+  ) (const_bound_0 ctx)
+
+let min_bound ctx = function
+  | [] -> const_bound_0 ctx
+  | l -> List.fold_left (fun min_bound bound ->
+    match min_bound, bound with
+    | Unbounded, _ -> bound
+    | _, Unbounded -> min_bound
+    | Bound e1, Bound e2 -> Bound (min_expr ctx e1 e2)
+  ) Unbounded l
 
 let pprint_bound_asymp bound = let open Z3 in
   let symbol_to_string e = Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl e)) in
@@ -38,7 +73,7 @@ let pprint_bound_asymp bound = let open Z3 in
       None
   in
   match bound with
-  | Bound e -> 
+  | Bound e ->
     let e = Z3.Expr.simplify e None in
     Printf.sprintf "O(%s)" (
     (* e is an addition of a numeral, constant, or multiplication of a numeral and constants *)
@@ -83,7 +118,37 @@ let pprint_bound = function
   | Bound e -> Z3.Expr.to_string (Z3.Expr.simplify e None)
   | Unbounded -> "∞"
 
-let get_local_bounds ctx vars ca_seq =
+let itvl_width itvl =
+  let lower, upper = itvl.Apron.Interval.inf, itvl.Apron.Interval.sup in
+  if (Apron.Scalar.is_infty lower) <> 0 || (Apron.Scalar.is_infty upper) <> 0 then
+    None
+  else
+    let lower = match lower with Apron.Scalar.Mpqf i -> i | _ -> assert false in
+    let upper = match upper with Apron.Scalar.Mpqf i -> i | _ -> assert false in
+    let lower = int_of_string (Mpqf.to_string lower) in
+    let upper = int_of_string (Mpqf.to_string upper) in
+    Some (upper - lower + 1)
+
+let get_ub_invariant var scc abs_map =
+  Ca_seq.G.fold_vertex (fun vertex greatest_width ->
+    match greatest_width with
+    | None -> None
+    | Some greatest_width ->
+      let apron_var = Apron.Var.of_string var in
+      let absv = Ai.VertexMap.find vertex abs_map in
+      let man = Apron.Abstract1.manager absv in
+      let itvl = Apron.Abstract1.bound_variable man absv apron_var in
+      match itvl_width itvl with
+      | None -> None
+      | Some this_width -> Some (max greatest_width this_width)
+  ) scc (Some 0)
+
+let get_ub_invariant_vars ranking_vars scc abs_map =
+  VariableSet.fold (fun v ub_map ->
+    VariableMap.add v (get_ub_invariant v scc abs_map) ub_map
+  ) ranking_vars VariableMap.empty
+
+let get_local_bounds ctx vars ca_seq abs_map =
   let open Ca_vertex in
   let sccs = Ca_seq.G.sccs ca_seq in
   let local_bounds = List.map (fun scc_seq ->
@@ -127,25 +192,28 @@ let get_local_bounds ctx vars ca_seq =
             Debugger.debug "local_bound" "Unbounded.\n" ;
             Candidate.Unbounded
           end else begin
+            let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map in
             Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (Util.DS.IdentifierSet.pprint ranking_vars) ;
-            Candidate.Var ranking_vars
+            Candidate.Var (ranking_vars, inv_ranking_vars)
           end
         end else begin
+          let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map in
           Debugger.debug "local_bound" "ranked by %s.\n" (Util.DS.IdentifierSet.pprint ranking_vars) ;
-          Candidate.Var ranking_vars
+          Candidate.Var (ranking_vars, inv_ranking_vars)
         end
       in
-      let (f,_),_,(t,_) = edge in
-      (f,t), local_bound
+      let (f,_),(_,ek),(t,_) = edge in
+      (f,ek,t), local_bound
     ) scc_sca_edges
   ) sccs in
   let local_bounds = List.concat local_bounds in
-  Ca_seq.G.fold_edges_e (fun ((f,_),_,(t,_)) l ->
-    let local_bound = match List.assoc_opt (f,t) local_bounds with
+  (* edges not appearing in SCC have constant bound 1 *)
+  Ca_seq.G.fold_edges_e (fun ((f,_),(_,ek),(t,_)) l ->
+    let local_bound = match List.assoc_opt (f,ek,t) local_bounds with
     | Some lb -> lb
     | None -> Candidate.Const 1
     in
-    ((f,t),local_bound) :: l
+    ((f,ek,t),local_bound) :: l
   ) ca_seq []
 
 let summary_ctr summary_name = Printf.sprintf "summary_ctr_%s" summary_name
@@ -154,65 +222,70 @@ let get_summary_of_summary_ctr id =
   if is_summary_ctr id then Some (Str.matched_group 1 id)
   else None 
 
-let pprint_env_bound_map map = String.concat "; " (List.map (fun (summary_name, bound) ->
+let pprint_env_bound_map ctx map = 
+  String.concat "; " (List.map (fun (summary_name, bound) ->
+  let bound = match bound with
+  | Unbounded -> Unbounded
+  | Bound expr ->
+    let params = Z3.Params.mk_params ctx in
+    Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
+    Bound (Z3.Expr.simplify expr (Some params))
+  in
   Printf.sprintf "%s = %s" (summary_ctr summary_name) (pprint_bound bound)
 ) (EnvBoundMap.bindings map))
 
-let get_refined_env_bounds effect_name env_bounds = function
-  | []     -> raise (Invalid_argument "Expect at least one local bound; infeasible edges should be assigned Const 0.")
-  | [ lb ] -> begin match lb with
-    | Candidate.Const i -> EnvBoundMap.add effect_name lb env_bounds
-    | _ -> env_bounds (* TODO bounded by variable *)
-  end
-  | _ -> env_bounds (* TODO multiple abstract edges with different ranking functions *)
-
-let pick_summary_counter_if_possible set =
-  (* TODO we prefer summary counters here, because we can bound we know their
-   * invairant by construction. In general, we should select the variable with 
-   * minimal bound here. *)
-  let summary_counters = VariableSet.filter is_summary_ctr set in
-  if VariableSet.is_empty summary_counters then
-    VariableSet.min_elt set
-  else
-    VariableSet.min_elt summary_counters
-
-let hitting_set_approx vars =
+let minimal_hitting_set_approx var_sets =
   (* Select minimal set of variables present in all Var bounds.
-  * The optimal solution would be computing the hitting set (NP-complete).
-  * We approximate this by
-  * (1) checking the intersection over all variable sets.
-  * (2) greedily picking one variable from each variable set. *)
-  let common_vars = match vars with
-    | varset :: _ -> List.fold_left VariableSet.inter varset vars
-    | []          -> VariableSet.empty
-  in
-  if VariableSet.is_empty common_vars then
-    List.map pick_summary_counter_if_possible vars
-  else
-    [ pick_summary_counter_if_possible common_vars ]
+   * The optimal solution would be computing the hitting set (NP-complete, Karp'72)
+   * We approximate this by checking the intersection over all variable sets. *)
+  match var_sets with
+  | var_set :: _ ->  (
+      let intersection = List.fold_left VariableSet.inter var_set var_sets in
+      assert (not (VariableSet.is_empty intersection)) ;
+      intersection
+  )
+  | [] -> (* no edges ranked by vars, hitting set is empty*)
+      VariableSet.empty
 
-let fold_bounds ctx env_bound_map bounds =
-  let c, unbounded, vars = List.fold_left (fun (const_carry, unbounded_carry, var_carry) bound ->
-    let open Candidate in match bound with
-    | Const i   -> const_carry + i, unbounded_carry, var_carry
-    | Unbounded -> const_carry    , true           , var_carry
-    | Var  vars -> const_carry    , unbounded_carry, vars :: var_carry
-  ) (0,false,[]) bounds in
+let max_map_element list_of_maps key =
+  List.fold_left (fun max_width map ->
+    let width = VariableMap.find key map in
+    match (max_width, width) with
+    | None, _ -> None
+    | _, None -> None
+    | Some i, Some j -> Some (max i j)
+  ) (Some 0) list_of_maps
+
+let variable_bound ctx env_bound_map invs var =
+  match get_summary_of_summary_ctr var with
+  | Some summary ->
+      (* var is an environment counter, by construction we can look its
+        * upper bound invariant up in the env bound map. *)
+      EnvBoundMap.find summary env_bound_map
+  | None ->
+      (* var is a CA counter, get its upper bound invariant from the
+        * interval abstract interpretation pass. *)
+      match max_map_element invs var with
+      | Some c -> Bound (Z3.mk_numeral ctx c)
+      | None -> Unbounded
+
+let fold_bounds ctx env_bound_map local_bounds_per_scc =
+  let const, unbounded, var_sets, invs =
+    List.fold_left (fun (const, unbounded, var_sets, invs) bound ->
+      let open Candidate in match bound with
+      | Const i            -> const + i, unbounded, var_sets           , invs
+      | Unbounded          -> const    , true     , var_sets           , invs
+      | Var (var_set, inv) -> const    , unbounded, var_set :: var_sets, inv :: invs
+    ) (0,false,[],[]) local_bounds_per_scc in
   if unbounded then Unbounded
   else
-    let vars = hitting_set_approx vars in
-    let var_bounds = List.map (fun var ->
-      (* TODO bound other variables *)
-      match get_summary_of_summary_ctr var with
-      | Some summary -> EnvBoundMap.find summary env_bound_map
-      | None -> Unbounded
-    ) vars in
-    if List.mem Unbounded var_bounds then
-      Unbounded
-    else
-      let c_expr = Util.Z3.mk_numeral ctx c in
-      let var_bound_exprs = List.map (function Bound e -> e | Unbounded -> assert false) var_bounds in
-      let sum_expr = Z3.Arithmetic.mk_add ctx (c_expr :: var_bound_exprs) in
+    let vars = VariableSet.elements (minimal_hitting_set_approx var_sets) in
+    let var_bounds = List.map (variable_bound ctx env_bound_map invs) vars in
+    match min_bound ctx var_bounds with
+    | Unbounded -> Unbounded
+    | Bound min_var_bound_expr ->
+      let c_expr = Util.Z3.mk_numeral ctx const in
+      let sum_expr = Z3.Arithmetic.mk_add ctx [c_expr ; min_var_bound_expr] in
       let params = Z3.Params.mk_params ctx in
       Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
       Bound (Z3.Expr.simplify sum_expr (Some params))
@@ -228,10 +301,6 @@ let multiply_by_env_num ctx = function
       let params = Z3.Params.mk_params ctx in
       Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
       Bound (Z3.Expr.simplify mult_expr (Some params))
-
-let const_bound ctx i = Bound (Util.Z3.mk_numeral ctx i)
-let const_bound_0 ctx = const_bound ctx 0
-let const_bound_1 ctx = const_bound ctx 1
 
 (* let refine_ca_rel_with_env_bounds ctx ca_rel env_bound_map = *)
 (*   let env_counter_constraint edge_type highest_prime = *)
@@ -354,7 +423,8 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
       if VariableSet.mem summary_name effects then Unbounded
       else const_bound_0 ctx
     in
-    EnvBoundMap.add summary_name initial_bound map
+    if summary_name = Scfg.effect_ID_name then map
+    else EnvBoundMap.add summary_name initial_bound map
   ) summaries_and_effects EnvBoundMap.empty) in
 
   (* Build CA from CFG *)
@@ -374,25 +444,38 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   (* For bounded CA summary edges, refine constraints on initial states, i.e., on summary counters *)
   let refined_constraints = refine_init_constraints_with_env_bounds constraints !env_bound_map in
 
+  let ca_rel = Ca_rel.of_seq ctx ca_seq in
+  let ca_sca = Ca_sca.of_rel ctx vars ca_rel in
+  Ca_seqDot.write_dot ca_seq dot_basename "seq" ;
+  Ca_relDot.write_dot ca_rel dot_basename "rel" ;
+  Ca_scaDot.write_dot ca_sca dot_basename "sca" ;
+
   (* Run interval abstract domain on CA and initial state constraints, to prune infeasible edges. *)
   Debugger.debug "bound" "Removing infeasible edges in CA... %!" ;
   let man, env, abs_map = Ai.do_abstract_computation_initial_values init_ca_loc refined_constraints (VariableSet.elements vars) ca_seq in
   let ca_pruned, num_inf = Ai.remove_infeasible man env abs_map ca_seq init_ca_loc in
   Debugger.debug "bound" "%d pruned\n%!" num_inf ;
 
-  let scc_seq = Ca_seq.G.scc_of_cfg_edge ca_pruned 11 0 (Scfg.E "deq_swing") in
-  let scc_seq = Ca_seq.propagate_equalities scc_seq in
-  let scc_rel = Ca_rel.of_seq ctx scc_seq in
-  let scc_sca = Ca_sca.of_rel ctx vars scc_rel in
-  Ca_seqDot.write_dot scc_seq dot_basename "scc_seq" ;
-  Ca_relDot.write_dot scc_rel dot_basename "scc_rel" ;
-  Ca_scaDot.write_dot scc_sca dot_basename "scc_sca" ;
+  (* let scc_seq = Ca_seq.G.scc_of_cfg_edge ca_pruned 11 0 (Scfg.E "deq_swing") in *)
+  (* let scc_seq = Ca_seq.propagate_equalities scc_seq in *)
+  (* let scc_rel = Ca_rel.of_seq ctx scc_seq in *)
+  (* let scc_sca = Ca_sca.of_rel ctx vars scc_rel in *)
+  (* Ca_seqDot.write_dot scc_seq dot_basename "scc_seq" ; *)
+  (* Ca_relDot.write_dot scc_rel dot_basename "scc_rel" ; *)
+  (* Ca_scaDot.write_dot scc_sca dot_basename "scc_sca" ; *)
 
   let ca_rel = Ca_rel.of_seq ctx ca_pruned in
   let ca_sca = Ca_sca.of_rel ctx vars ca_rel in
-  Ca_seqDot.write_dot ca_pruned dot_basename "seq" ;
-  Ca_relDot.write_dot ca_rel dot_basename "rel" ;
-  Ca_scaDot.write_dot ca_sca dot_basename "sca" ;
+  Ca_seqDot.write_dot ca_pruned dot_basename "seq_pruned" ;
+  Ca_relDot.write_dot ca_rel dot_basename "rel_pruned" ;
+  Ca_scaDot.write_dot ca_sca dot_basename "sca_pruned" ;
+  List.iteri (fun i scc_seq ->
+    let scc_rel = Ca_rel.of_seq ctx scc_seq in
+    let scc_sca = Ca_sca.of_rel ctx vars scc_rel in
+    Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ;
+    Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i)
+  ) (Ca_seq.G.sccs ca_pruned) ;
+
   Debugger.info "stats" "CFG: %s, CA: %s, CA (pruned): %s, CA_rel: %s, CA_sca: %s\n" (Cfg.G.pprint_stats cfg) (Ca_seq.G.pprint_stats ca_seq) (Ca_seq.G.pprint_stats ca_pruned) (Ca_rel.G.pprint_stats ca_rel) (Ca_sca.G.pprint_stats ca_sca) ;
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
@@ -403,11 +486,11 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   let iteration = ref 1 in
   let result = ref CfgEdgeMap.empty in
   while !iteration > 0 do
-    Printf.printf "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map !env_bound_map) ;
+    Printf.printf "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
 
-    let ca_local_bound_map = get_local_bounds ctx vars !ca in
-    let get_ca_local_bounds f t = List.fold_left (fun l ((f',t'),lb) ->
-      if f'=f && t'=t then lb :: l else l
+    let ca_local_bound_map = get_local_bounds ctx vars !ca abs_map in
+    let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
+      if f'=f && t'=t && ek' = ek then lb :: l else l
     ) [] ca_local_bound_map in
 
     let edge_bound_map, summary_bounds_map = 
@@ -416,7 +499,7 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
         (* For edge f->t, get a list of local bounds (at most one for each f->t edge in the CA) *)
         let edge_bound =
           (* Check feasibility by checking whether an edge f->t its present in the CA. *)
-          match get_ca_local_bounds f t with
+          match get_ca_local_bounds f t edge_type with
             | [] ->
               (* There is no f->t edge in the CA. Thus f->t is infeasible. *)
               const_bound_0 ctx
@@ -456,7 +539,8 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
           let expr_list = List.map (function Bound e -> e | _ -> assert false) effect_bound_list in
           Bound (Z3.Arithmetic.mk_add ctx expr_list)
       in
-      EnvBoundMap.add summary_name sum_bound env_bound_map'
+      if summary_name = Scfg.effect_ID_name then env_bound_map'
+      else EnvBoundMap.add summary_name sum_bound env_bound_map'
     ) summary_bounds_map EnvBoundMap.empty
     in
 
@@ -491,19 +575,6 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
 let get_numeral = Z3.Arithmetic.Integer.get_int
 let get_numeral_opt e = if Z3.Expr.is_numeral e then Some (get_numeral e) else None
 
-(* Simplify max expressions so we don't have lots of its in the bound expression *)
-let maxbound ctx a b =
-  let open Z3 in
-  let ngt0 = Arithmetic.mk_gt ctx (Z3.mk_const ctx "N") (Z3.mk_numeral ctx 0) in
-  let ageb = Arithmetic.mk_ge ctx a b in
-  let bgea = Arithmetic.mk_ge ctx b a in
-  if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 ageb) then
-    a
-  else if Z3.check_valid ctx (Boolean.mk_implies ctx ngt0 bgea) then
-    b
-  else
-    Boolean.mk_ite ctx (Arithmetic.mk_gt ctx a b) a b
-
 (** Map any edge to [0] (black). *)
 let def_get_color _ = 0
 
@@ -524,13 +595,7 @@ let compute_bounds ?(dot_basename="") ?(get_edge_color=def_get_color) init_ca_lo
   let edge_bound_map = Cfg.G.fold_edges_e (fun (f,(_,et),t) edge_bound_map ->
     let e = f,et,t in
     let bounds = List.map (CfgEdgeMap.find e) bounds_per_init_heap in
-    let max_bound = List.fold_left (fun acc bound ->
-      match (acc, bound) with
-      | Unbounded, _         -> Unbounded
-      |         _, Unbounded -> Unbounded
-      | Bound expr_acc, Bound expr -> Bound (maxbound ctx expr_acc expr)
-    ) (const_bound_0 ctx) bounds in
-    CfgEdgeMap.add e max_bound edge_bound_map
+    CfgEdgeMap.add e (max_bound ctx bounds) edge_bound_map
   ) cfg CfgEdgeMap.empty in
 
   print_edge_bound_map edge_bound_map ;
