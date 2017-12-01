@@ -2,11 +2,6 @@ open Apron
 
 open Ca_seq
 
-(* USAGE: *)
-(* let man, env, abs_map = Ai.do_abstract_computation_initial_values init_heaps ca in *)
-(* let num_inf = Ai.remove_infeasible man env abs_map ca in *)
-(* Printf.printf "Removing infeasible edges (%d)...\n" num_inf ; *)
-
 (* data structure module declarations {{{ *)
 
 module VertexMap = Map.Make(struct
@@ -21,12 +16,15 @@ let abs_map_equal man a b =
 
 (* }}} *)
 
-let print_absv man abs_map ca =
-  Ca_seq.G.iter_vertex (fun cloc ->
+let print_absv man env v absv =
+  let box = Abstract1.to_box man absv in
+  Format.printf "%s %a %a@." (Ca_vertex.pprint v) (fun x -> Environment.print x) env (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
+
+let print_abs_map man env abs_map ca =
+  Ca_seq.G.iter_vertex (fun ca_loc ->
     let open Apron in
-    let absv = VertexMap.find cloc abs_map in
-    let box = Abstract1.to_box man absv in
-    Format.printf "%s %a@." (Ca_vertex.pprint cloc) (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
+    let absv = VertexMap.find ca_loc abs_map in
+    print_absv man env ca_loc absv
   ) ca
 
 (* sequential (atomic) abstract execution {{{ *)
@@ -266,7 +264,10 @@ let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
     VertexMap.add current_cloc absv map
   ) cfg VertexMap.empty
   in
-  do_abstract_computation man env abs_map cfg
+  (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
+  let man, env, abs_map = do_abstract_computation man env abs_map cfg in
+  (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
+  man, env, abs_map
 
 (* }}} *)
 
