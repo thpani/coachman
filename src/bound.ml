@@ -176,7 +176,7 @@ let itvl_width itvl =
     let upper = match upper with Apron.Scalar.Mpqf i -> i | _ -> assert false in
     let lower = int_of_string (Mpqf.to_string lower) in
     let upper = int_of_string (Mpqf.to_string upper) in
-    Some (upper - lower + 1)
+    Some (upper - lower)
 
 let get_ub_invariant var scc abs_map =
   Ca_seq.G.fold_vertex (fun vertex greatest_width ->
@@ -304,8 +304,8 @@ let max_map_element list_of_maps key =
     | Some i, Some j -> Some (max i j)
   ) (Some 0) list_of_maps
 
-let variable_bound ctx env_bound_map invs var =
-  match get_summary_of_summary_ctr var with
+let variable_bound ctx env_bound_map invs self_loop var =
+  let bound = match get_summary_of_summary_ctr var with
   | Some summary ->
       (* var is an environment counter, by construction we can look its
         * upper bound invariant up in the env bound map. *)
@@ -316,8 +316,14 @@ let variable_bound ctx env_bound_map invs var =
       match max_map_element invs var with
       | Some c -> Bound (Z3.mk_numeral ctx c)
       | None -> Unbounded
+  in
+  (* if the transition is not a self-loop, add +1 for edges *before* the test *)
+  match (bound, self_loop) with
+  | Bound e, true -> Bound e
+  | Bound e, false -> Bound (Z3.Arithmetic.mk_add ctx [ e ; (Z3.mk_numeral ctx 1)])
+  | Unbounded, _ -> Unbounded
 
-let fold_bounds ctx env_bound_map local_bounds_per_scc =
+let fold_bounds ctx env_bound_map local_bounds_per_scc self_loop =
   let const, unbounded, var_sets, invs =
     List.fold_left (fun (const, unbounded, var_sets, invs) bound ->
       let open Candidate in match bound with
@@ -328,7 +334,7 @@ let fold_bounds ctx env_bound_map local_bounds_per_scc =
   if unbounded then Unbounded
   else
     let vars = VariableSet.elements (minimal_hitting_set_approx var_sets) in
-    let var_bounds = List.map (variable_bound ctx env_bound_map invs) vars in
+    let var_bounds = List.map (variable_bound ctx env_bound_map invs self_loop) vars in
     match min_bound ctx var_bounds with
     | Unbounded -> Unbounded
     | Bound min_var_bound_expr ->
@@ -559,7 +565,7 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
               let edge_belongs_to_cfg_scc =
                 List.exists (Cfg.G.equal_edge_ignore_labels (f,edge_type,t)) cfg_scc_edges in
               if edge_belongs_to_cfg_scc then
-                fold_bounds ctx !env_bound_map ca_edge_local_bounds
+                fold_bounds ctx !env_bound_map ca_edge_local_bounds (f=t)
               else
                 const_bound_1 ctx
         in
