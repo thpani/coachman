@@ -197,43 +197,42 @@ let get_ub_invariant_vars ranking_vars scc abs_map =
     VariableMap.add v (get_ub_invariant v scc abs_map) ub_map
   ) ranking_vars VariableMap.empty
 
-let get_local_bounds ctx vars ca_seq abs_map =
+let get_local_bounds ctx man env vars ca_seq abs_map =
   let open Ca_vertex in
   let sccs = Ca_seq.G.sccs ca_seq in
   let local_bounds = List.map (fun scc_seq ->
     let scc_seq = Ca_seq.propagate_equalities scc_seq in
     let scc_sca = Ca_sca.of_seq ctx vars scc_seq in
-    let scc_sca_edges = Ca_sca.G.fold_edges_e List.cons scc_sca [] in
     let var_edge_map = VariableSet.fold (fun var map ->
-      let edges_ranked_by_var = List.filter (fun edge -> (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
+      let edges_ranked_by_var = Ca_sca.G.filter_edge_e (fun edge -> (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
         let _,(dc,_),_ = edge in
         let decreases_on_edge = (VariableMap.find var dc) = Ca_sca.Strict in
-        let increases_in_scc = List.fold_left (fun b (_,(dc,_),_) -> b || ((VariableMap.find var dc) = Ca_sca.DontKnow)) false scc_sca_edges in
+        let increases_in_scc = Ca_sca.G.fold_edges_e (fun (_,(dc,_),_) b -> b || ((VariableMap.find var dc) = Ca_sca.DontKnow)) scc_sca false in
         decreases_on_edge && (not increases_in_scc)
-      ) scc_sca_edges in
+      ) scc_sca in
       VariableMap.add var edges_ranked_by_var map
     ) vars VariableMap.empty in
     (* VariableMap.iter (fun var edges_ranked_by_var -> *)
     (*   Printf.printf "Variable %s ranks edges:\n" var ; *)
     (*   List.iter (fun edge -> Printf.printf "  %s" (pprint_edge edge)) edges_ranked_by_var *)
     (* ) var_edge_map ; *)
-    List.map (fun edge ->
+    Ca_sca.G.fold_edges_e (fun edge map ->
       Debugger.debug "local_bound" "  Edge %s " (Ca_sca.G.pprint_edge edge) ;
       (* (2) Let v ∈ V. We define ξ(v) ⊆ E to be the set of all transitions τ = l1 → l2 ∈ E such that v' ≤ v + c ∈ u for some c < 0. For all τ ∈ ξ(v) we set ζ(τ) = v. *)
       let local_bound =
         let ranking_vars = VariableSet.filter (fun var ->
           let edges_ranked_by_var = VariableMap.find var var_edge_map in
-          List.exists (Ca_sca.G.equal_edge edge) edges_ranked_by_var
+          Ca_sca.G.mem_edge_e edges_ranked_by_var edge
         ) vars in
         if VariableSet.is_empty ranking_vars then begin
           Debugger.debug "local_bound" "ranked by none. " ;
           (* (3) Let v ∈ V and τ ∈ E. Assume τ was not yet assigned a local bound by (1) or (2). We set ζ(τ) = v, if τ does not belong to a strongly connected component (SCC) of the directed graph (L, E′) where E′ = E \ {ξ(v)} (the control flow graph of ∆P without the transitions in ξ(v)). *)
           let ranking_vars = VariableSet.filter (fun var ->
             let edges_ranked_by_var = VariableMap.find var var_edge_map in
-            let scc_without_edges_ranked_by_var = List.filter (fun edge ->
-              let is_edge_ranked_by_var = List.exists (Ca_sca.G.equal_edge edge) edges_ranked_by_var in
+            let scc_without_edges_ranked_by_var = Ca_sca.G.filter_edge_e (fun edge ->
+              let is_edge_ranked_by_var = Ca_sca.G.mem_edge_e edges_ranked_by_var edge in
               not is_edge_ranked_by_var
-            ) scc_sca_edges in
+            ) scc_sca in
             let var_breaks_scc = not (Ca_sca.G.edge_in_scc edge scc_without_edges_ranked_by_var) in
             var_breaks_scc
           ) vars in
@@ -252,8 +251,8 @@ let get_local_bounds ctx vars ca_seq abs_map =
         end
       in
       let (f,_),(_,ek),(t,_) = edge in
-      (f,ek,t), local_bound
-    ) scc_sca_edges
+      ((f,ek,t), local_bound) :: map
+    ) scc_sca []
   ) sccs in
   let local_bounds = List.concat local_bounds in
   (* edges not appearing in SCC have constant bound 1 *)

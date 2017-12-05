@@ -126,8 +126,7 @@ module G (C:GConfig) = struct
       List.fold_left (fun g edge -> add_edge_e g edge) empty scc_edges
     ) (scc_edges g)
 
-  let edge_in_scc edge scc =
-    let g = List.fold_left add_edge_e empty scc in
+  let edge_in_scc edge g =
     let scc_edges = List.concat (scc_edges g) in
     List.exists (equal_edge edge) scc_edges
 
