@@ -7,7 +7,7 @@ MS_FUNCS := emp deq enq
 MS_FUNCS_PREFIXED := $(foreach func,$(MS_FUNCS),testms_$(func))
 MS := testms $(MS_FUNCS_PREFIXED) $(foreach func,$(MS_FUNCS_PREFIXED),$(func)_nolag)
 
-.PHONY: all clean native unit doc test testclean $(TREIBER) $(MS)
+.PHONY: all clean native unit doc install test testclean $(TREIBER) $(MS)
 
 all: native
 
@@ -24,6 +24,9 @@ unit:
 doc:
 	$(OCB) doc/api.docdir/index.html
 	$(OCB) doc/api.docdir/api.dot
+
+install: native
+	install main.native /usr/bin/l2ca
 
 test: $(TREIBER) $(MS)
 
