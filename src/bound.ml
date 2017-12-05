@@ -526,6 +526,7 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   List.iteri (fun i scc_seq ->
     let scc_rel = Ca_rel.of_seq ctx scc_seq in
     let scc_sca = Ca_sca.of_rel ctx vars scc_rel in
+    Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ;
     Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ;
     Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i)
   ) (Ca_seq.G.sccs ca_pruned) ;
@@ -542,7 +543,7 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   while !iteration > 0 do
     Printf.printf "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
 
-    let ca_local_bound_map = get_local_bounds ctx vars !ca abs_map in
+    let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map in
     let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
       if f'=f && t'=t && ek' = ek then lb :: l else l
     ) [] ca_local_bound_map in
