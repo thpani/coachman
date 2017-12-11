@@ -22,6 +22,8 @@ type stmt =
 
 type seq = stmt list
 
+type ploc = Scfg.ploc
+
 (* }}} *)
 
 (* pretty printing functions {{{ *)
@@ -50,7 +52,7 @@ and pprint_seq ?(sep=";\n") stmts =
 (* graph module declarations {{{ *)
 
 module G = Scfg.G(struct
-  type vertex = Scfg.ploc
+  type vertex = ploc
   type edge_label = seq
 
   let compare_vertex = Pervasives.compare
