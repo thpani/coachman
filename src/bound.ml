@@ -72,7 +72,7 @@ module Complexity = struct
     | Unknown      -> failwith "Unknown is greater AND smaller than all others, thus has no rank"
 
   let pprint = function
-    | Const i      -> Printf.sprintf "O(%d)" (min i 1)
+    | Const i      -> Printf.sprintf "O(%d)" i
     | Linear s     -> Printf.sprintf "O(%s)" s
     | Polynomial l -> (match l with [ (id, pow) ] -> Printf.sprintf "%s^%d" id pow | _ -> "???")
     | Unbounded    -> "∞"
@@ -96,7 +96,7 @@ let symbol_to_string e =
 
 let get_const e =
   if Z3.Expr.is_numeral e then
-    Some (Complexity.Const (Z3.Arithmetic.Integer.get_int e))
+    Some (Complexity.Const (min (Z3.Arithmetic.Integer.get_int e) 1))
   else if Z3.Expr.is_const e then
     Some (Complexity.Linear (symbol_to_string e))
   else
