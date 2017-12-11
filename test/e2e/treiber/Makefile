@@ -1,6 +1,6 @@
 .PHONY: all clean emp pop push
 
-BIN = ../../../main.native
+BIN = ../../../codscost.native
 
 all: emp pop push
 

@@ -1,6 +1,6 @@
 .PHONY: all clean emp emp_nolag deq deq_nolag enq enq_nolag
 
-BIN = ../../../main.native
+BIN = ../../../codscost.native ${ARGS}
 
 all: emp emp_nolag deq deq_nolag enq enq_nolag
 
@@ -23,4 +23,4 @@ enq:
 	$(BIN) ms_enq.tiny ms.heap ms_enq.summaries
 
 enq_nolag:
-	$(BIN) ms_enq.tiny ms_nolag.heap ms_enq.summaries
+	$(BIN) ms_enq.tiny ms.tail_nolag.heap ms_enq.summaries

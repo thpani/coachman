@@ -15,10 +15,10 @@ clean:
 	$(OCB) -clean
 
 native:
-	$(OCB) main.native
+	$(OCB) codscost.native
 
 unit:
-	$(OCB) -package oUnit -I test/unit sca.native
+	$(OCB) sca.native
 	./sca.native
 
 doc:
@@ -26,7 +26,7 @@ doc:
 	$(OCB) doc/api.docdir/api.dot
 
 install: native
-	install main.native /usr/bin/l2ca
+	install codscost.native /usr/bin/l2ca
 
 test: $(TREIBER) $(MS)
 
