@@ -1,4 +1,4 @@
-OCB_FLAGS = -use-ocamlfind -I src -I src/programs -I src/heaps
+OCB_FLAGS = -use-ocamlfind -I src -I src/programs -I src/heaps -I test/e2e -I test/unit
 OCB = ocamlbuild $(OCB_FLAGS)
 
 TREIBER_FUNCS := emp pop push
@@ -20,6 +20,10 @@ native:
 unit:
 	$(OCB) sca.native
 	./sca.native
+
+e2e:
+	$(OCB) test.native
+	./test.native
 
 doc:
 	$(OCB) doc/api.docdir/index.html
