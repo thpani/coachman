@@ -10,6 +10,17 @@ module List = struct
       | hd :: tl -> if hd = x then c else func x tl (c+1)
       | [] -> failwith "Not Found"
     in func x lst 0
+
+  (** Pretty-print a list. *)
+  let pprint formatter lst = "[ " ^ (String.concat ", " (List.map formatter lst)) ^ " ]"
+end
+
+(** Extend module [Array] with useful helper functions *)
+module Array = struct
+  include Array
+
+  (** Pretty-print an array. *)
+  let pprint formatter lst = "[ " ^ (String.concat ", " (List.map formatter (Array.to_list lst))) ^ " ]"
 end
 
 (** Extend module [Z3] with useful helper functions *)
