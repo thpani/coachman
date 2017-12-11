@@ -288,9 +288,10 @@ let minimal_hitting_set_approx var_sets =
    * We approximate this by checking the intersection over all variable sets. *)
   match var_sets with
   | var_set :: _ ->  (
-      let intersection = List.fold_left VariableSet.inter var_set var_sets in
-      assert (not (VariableSet.is_empty intersection)) ;
-      intersection
+    (* print_endline (List.pprint VariableSet.pprint var_sets) ; *)
+    let intersection = List.fold_left VariableSet.inter var_set var_sets in
+    assert (not (VariableSet.is_empty intersection)) ;
+    intersection
   )
   | [] -> (* no edges ranked by vars, hitting set is empty*)
       VariableSet.empty
