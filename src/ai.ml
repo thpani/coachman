@@ -16,16 +16,21 @@ let abs_map_equal man a b =
 
 (* }}} *)
 
+let pprint_absv man absv =
+  let box = Abstract1.to_box man absv in
+  Format.asprintf "%a" (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
+
 let print_absv man env v absv =
   let box = Abstract1.to_box man absv in
-  Format.printf "%s %a %a@." (Ca_vertex.pprint v) (fun x -> Environment.print x) env (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
+  Format.printf "%s@[<2>@ %a@ %a@]\n" (Ca_vertex.pprint v) (fun x -> Environment.print x) env (Abstract0.print_array Interval.print) box.Apron.Abstract1.interval_array
 
 let print_abs_map man env abs_map ca =
   Ca_seq.G.iter_vertex (fun ca_loc ->
     let open Apron in
     let absv = VertexMap.find ca_loc abs_map in
     print_absv man env ca_loc absv
-  ) ca
+  ) ca ;
+  Format.print_flush ()
 
 (* sequential (atomic) abstract execution {{{ *)
 
