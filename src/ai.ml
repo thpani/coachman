@@ -209,20 +209,24 @@ let absv_rel man env absv (expr, highest_prime) =
 
 (* abstract interpretation fixpoint computation {{{ *)
 
-let do_abstract_computation man env abs_map cfg =
+let do_abstract_computation man env init_abs_map cfg =
   let vars, _ = Environment.vars env in
-  let abs_map = ref abs_map in
-  let prev_abs_map = ref VertexMap.empty in
+  let q = Queue.create() in
+  (* print_abs_map man env !abs_map cfg ; *)
+  G.iter_vertex (fun v -> Queue.add v q) cfg ;
+  let abs_map = ref (G.fold_vertex (fun v abs_map ->
+    VertexMap.add v (Abstract1.bottom man env) abs_map) cfg VertexMap.empty)
+  in
   try begin
-    while not (abs_map_equal man !abs_map !prev_abs_map) do
-      prev_abs_map := !abs_map ;
-      abs_map := G.fold_vertex (fun vertex map ->
-        let incoming_absv = G.fold_pred_e (fun (fvertex, (stmts, _), _) l ->
-          let absv_fploc = VertexMap.find fvertex !abs_map in
-          (absv_seq man env absv_fploc stmts) :: l
-        ) cfg vertex [] in
-        let absv_list = (VertexMap.find vertex !abs_map) :: incoming_absv in
-        let absv = Abstract1.join_array man (Array.of_list absv_list) in
+    while not (Queue.is_empty q) do
+      let vertex = Queue.pop q in
+      let init_absv = VertexMap.find vertex init_abs_map in
+      let incoming_absv = G.fold_pred_e (fun (fvertex, (stmts, _), _) l ->
+        let absv_fploc = VertexMap.find fvertex !abs_map in
+        (absv_seq man env absv_fploc stmts) :: l
+      ) cfg vertex [ init_absv ] in
+      let new_absv =
+        let absv = Abstract1.join_array man (Array.of_list incoming_absv) in
         let widened_itvl_array = Array.map (fun var ->
           let itvl = Abstract1.bound_variable man absv var in
           let testitvl = Interval.of_int 1 3 in
@@ -230,8 +234,14 @@ let do_abstract_computation man env abs_map cfg =
         ) vars
         in
         let widened_absv = Abstract1.of_box man env vars widened_itvl_array in
-        VertexMap.add vertex widened_absv map
-      ) cfg !abs_map
+        widened_absv
+      in
+      let current_absv = VertexMap.find vertex !abs_map in
+      if not (Abstract1.is_eq man new_absv current_absv) then
+        G.iter_succ (fun succ -> Queue.push succ q) cfg vertex
+      ;
+      abs_map := VertexMap.add vertex new_absv !abs_map ;
+      (* print_abs_map man env !abs_map cfg ; *)
     done ;
     man, env, !abs_map
   end
@@ -272,18 +282,27 @@ let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
   (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
   let man, env, abs_map = do_abstract_computation man env abs_map cfg in
   (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
+  (* print_abs_map man env abs_map cfg ; *)
   man, env, abs_map
 
 (* }}} *)
 
 let remove_infeasible man env abs_map cfg initv =
-  let g_wo_inf_edges, num_inf = G.fold_edges_e (fun e (acc_g,acc_removed) ->
-    let fvertex, (stmts, _), _ = e in
-    let absv  = VertexMap.find fvertex abs_map in
-    let absv' = absv_seq man env absv stmts in
-    if Abstract1.is_bottom man absv' then
-      acc_g, acc_removed+1
+  let g_wo_inf_edges, num_inf = 
+    if (Environment.dimension env).Apron.Dim.intd = 0 then
+      (* if dim = 0, the box is trivially empty.
+       * this does not mean that the edge is infeasible *)
+      cfg, 0
     else
-      G.add_edge_e acc_g e, acc_removed
+      G.fold_edges_e (fun e (acc_g,acc_removed) ->
+      let fvertex, (stmts, _), _ = e in
+      let absv  = VertexMap.find fvertex abs_map in
+      let absv' = absv_seq man env absv stmts in
+      if Abstract1.is_bottom man absv' then
+        acc_g, acc_removed+1
+      else
+        G.add_edge_e acc_g e, acc_removed
   ) cfg (G.empty, 0) in
-  G.remove_unreachable g_wo_inf_edges initv, num_inf
+  match initv with
+  | Some initv -> G.remove_unreachable g_wo_inf_edges initv, num_inf
+  | None       ->                      g_wo_inf_edges      , num_inf

@@ -514,7 +514,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* Run interval abstract domain on CA and initial state constraints, to prune infeasible edges. *)
   Debugger.debug "bound" "Removing infeasible edges in CA... %!" ;
   let man, env, abs_map = Ai.do_abstract_computation_initial_values init_ca_loc refined_constraints (VariableSet.elements vars) ca_seq in
-  let ca_pruned, num_inf = Ai.remove_infeasible man env abs_map ca_seq init_ca_loc in
+  let ca_pruned, num_inf = Ai.remove_infeasible man env abs_map ca_seq (Some init_ca_loc) in
   Debugger.debug "bound" "%d pruned\n%!" num_inf ;
 
   (* let scc_seq = Ca_seq.G.scc_of_cfg_edge ca_pruned 11 0 (Scfg.E "deq_swing") in *)
