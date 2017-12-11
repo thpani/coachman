@@ -85,12 +85,12 @@ let qe ctx highest_prime vars expr =
   Expr.simplify sub_expr None
 
 (** [of_seq ctx ca] converts a CA with sequential edge labels [ca] into one with transition relations as edge labels. *)
-let of_seq ctx ?(do_qe=true) ca =
+let of_seq ctx ca =
   let vars = collect_vars ca in
   Ca_seq.G.fold_edges_e (fun (from, (stmts, summary), to_) ca_rel ->
     let highest_prime = List.length stmts in
     let expr = torel_seq ctx stmts vars in
-    if do_qe then 
+    if !Config.qe then 
       let qe_expr = qe ctx highest_prime vars expr in
       G.add_edge_e ca_rel (from, ((qe_expr, 1), summary), to_)
     else

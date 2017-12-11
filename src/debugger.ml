@@ -21,14 +21,18 @@ let lvl_of_string = function
 let current_level = ref Info
 let current_components : component list ref = ref []
 
-let logf lvl component =
-  if List.mem component !current_components && ord lvl >= ord !current_level then (
+let logf lvl =
+  if ord lvl >= ord !current_level then (
     printf "[%s] " (string_of_lvl lvl) ;
     printf
   ) else ifprintf stdout
+
+let logc lvl component =
+  if List.mem component !current_components then logf lvl
+  else ifprintf stdout
 
 (* http://caml.inria.fr/pub/old_caml_site/FAQ/FAQ_EXPERT-eng.html#eta_expansion *)
 let error f = logf Error f
 let warn  f = logf Warn  f
 let info  f = logf Info  f
-let debug f = logf Debug f
+let debug f = logc Debug f

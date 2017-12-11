@@ -438,30 +438,36 @@ module CfgEdgeMap = Map.Make(CfgEdge)
 (** Print edge bound map *)
 let print_edge_bound_map =
   CfgEdgeMap.iter (fun (f,et,t) local_bounds ->
-    Printf.printf "%s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,([],et),t)) (pprint_bound_asymp local_bounds) (pprint_bound local_bounds)
+    Debugger.info "%s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint_bound local_bounds)
 )
 
-let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_loc, constraints) =
-  Printf.printf "# Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
+let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constraints) =
+  Debugger.info "# Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
 
   (* setup dot output *)
-  let dot_basename = Printf.sprintf "%s_heap%d" dot_basename i in
+  (* let dot_basename = Printf.sprintf "%s_heap%d" !Config.dot_basename i in *)
   (* let dot_basename = dot_basename^(Ca_vertex.pprint_structure (snd init_ca_loc)) in *)
-  let module Ca_seqDot = Ca_seq.G.Dot (struct
-    type edge = Ca_seq.G.E.t
-    let color_edge = get_edge_color
-    let pprint_edge_label (f,(stmts,e),t) = Printf.sprintf "%s\n%s" (Ca_seq.pprint_seq stmts) (Scfg.pprint_edge_kind e)
-  end) in
-  let module Ca_relDot = Ca_rel.G.Dot (struct
-    type edge = Ca_rel.G.E.t
-    let color_edge = get_edge_color
-    let pprint_edge_label (f,(trel,e),t) = Printf.sprintf "%s\n%s" (Ca_rel.pprint_transrel trel) (Scfg.pprint_edge_kind e)
-  end) in
-  let module Ca_scaDot = Ca_sca.G.Dot (struct
-    type edge = Ca_sca.G.E.t
-    let color_edge = get_edge_color
-    let pprint_edge_label (f,(trel,e),t) = Printf.sprintf "%s\n%s" (Ca_sca.pprint_transition trel) (Scfg.pprint_edge_kind e)
-  end) in
+  (* let module Ca_seqDot = Ca_seq.G.Dot (struct *)
+  (*   type edge = Ca_seq.G.E.t *)
+  (*   type vertex = Ca_vertex.ca_loc *)
+  (*   let pprint_vertex = Ca_vertex.Vertex.pprint_vertex *)
+  (*   let color_edge = get_edge_color *)
+  (*   let pprint_edge_label (f,(stmts,e),t) = Printf.sprintf "%s\n%s" (Ca_seq.pprint_seq stmts) (Scfg.pprint_edge_kind e) *)
+  (* end) in *)
+  (* let module Ca_relDot = Ca_rel.G.Dot (struct *)
+  (*   type edge = Ca_rel.G.E.t *)
+  (*   type vertex = Ca_vertex.ca_loc *)
+  (*   let pprint_vertex = Ca_vertex.Vertex.pprint_vertex *)
+  (*   let color_edge = get_edge_color *)
+  (*   let pprint_edge_label (f,(trel,e),t) = Printf.sprintf "%s\n%s" (Ca_rel.pprint_transrel trel) (Scfg.pprint_edge_kind e) *)
+  (* end) in *)
+  (* let module Ca_scaDot = Ca_sca.G.Dot (struct *)
+  (*   type edge = Ca_sca.G.E.t *)
+  (*   type vertex = Ca_vertex.ca_loc *)
+  (*   let pprint_vertex = Ca_vertex.Vertex.pprint_vertex *)
+  (*   let color_edge = get_edge_color *)
+  (*   let pprint_edge_label (f,(trel,e),t) = Printf.sprintf "%s\n%s" (Ca_sca.pprint_transition trel) (Scfg.pprint_edge_kind e) *)
+  (* end) in *)
 
   (* Get lists of summary, effect names from CFG *)
   let summaries, effects = Cfg.G.fold_edges_e (fun (_,(_,summary_ref),_) (summaries, effects) ->
@@ -498,11 +504,12 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   (* For bounded CA summary edges, refine constraints on initial states, i.e., on summary counters *)
   let refined_constraints = refine_init_constraints_with_env_bounds constraints !env_bound_map in
 
-  let ca_rel = Ca_rel.of_seq ctx ca_seq in
-  let ca_sca = Ca_sca.of_rel ctx vars ca_rel in
-  Ca_seqDot.write_dot ca_seq dot_basename "seq" ;
-  Ca_relDot.write_dot ca_rel dot_basename "rel" ;
-  Ca_scaDot.write_dot ca_sca dot_basename "sca" ;
+  (* Debugger.debug "bound" "Abstracting CA...\n%!" ; *)
+  (* let ca_rel = Ca_rel.of_seq ctx ca_seq in *)
+  (* let ca_sca = Ca_sca.of_rel ctx vars ca_rel in *)
+  (* Ca_seqDot.write_dot ca_seq dot_basename "seq" ; *)
+  (* Ca_relDot.write_dot ca_rel dot_basename "rel" ; *)
+  (* Ca_scaDot.write_dot ca_sca dot_basename "sca" ; *)
 
   (* Run interval abstract domain on CA and initial state constraints, to prune infeasible edges. *)
   Debugger.debug "bound" "Removing infeasible edges in CA... %!" ;
@@ -518,20 +525,21 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   (* Ca_relDot.write_dot scc_rel dot_basename "scc_rel" ; *)
   (* Ca_scaDot.write_dot scc_sca dot_basename "scc_sca" ; *)
 
-  let ca_rel = Ca_rel.of_seq ctx ca_pruned in
-  let ca_sca = Ca_sca.of_rel ctx vars ca_rel in
-  Ca_seqDot.write_dot ca_pruned dot_basename "seq_pruned" ;
-  Ca_relDot.write_dot ca_rel dot_basename "rel_pruned" ;
-  Ca_scaDot.write_dot ca_sca dot_basename "sca_pruned" ;
-  List.iteri (fun i scc_seq ->
-    let scc_rel = Ca_rel.of_seq ctx scc_seq in
-    let scc_sca = Ca_sca.of_rel ctx vars scc_rel in
-    Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ;
-    Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ;
-    Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i)
-  ) (Ca_seq.G.sccs ca_pruned) ;
+  (* Debugger.debug "bound" "Abstracting CA...\n%!" ; *)
+  (* let ca_rel = Ca_rel.of_seq ctx ca_pruned in *)
+  (* let ca_sca = Ca_sca.of_rel ctx vars ca_rel in *)
+  (* Ca_seqDot.write_dot ca_pruned dot_basename "seq_pruned" ; *)
+  (* Ca_relDot.write_dot ca_rel dot_basename "rel_pruned" ; *)
+  (* Ca_scaDot.write_dot ca_sca dot_basename "sca_pruned" ; *)
+  (* List.iteri (fun i scc_seq -> *)
+  (*   let scc_rel = Ca_rel.of_seq ctx scc_seq in *)
+  (*   let scc_sca = Ca_sca.of_rel ctx vars scc_rel in *)
+  (*   Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ; *)
+  (*   Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ; *)
+  (*   Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i) *)
+  (* ) (Ca_seq.G.sccs ca_pruned) ; *)
 
-  Debugger.info "stats" "CFG: %s, CA: %s, CA (pruned): %s, CA_rel: %s, CA_sca: %s\n" (Cfg.G.pprint_stats cfg) (Ca_seq.G.pprint_stats ca_seq) (Ca_seq.G.pprint_stats ca_pruned) (Ca_rel.G.pprint_stats ca_rel) (Ca_sca.G.pprint_stats ca_sca) ;
+  (* Debugger.debug "stats" "CFG: %s, CA: %s, CA (pruned): %s, CA_rel: %s, CA_sca: %s\n" (Cfg.G.pprint_stats cfg) (Ca_seq.G.pprint_stats ca_seq) (Ca_seq.G.pprint_stats ca_pruned) (Ca_rel.G.pprint_stats ca_rel) (Ca_sca.G.pprint_stats ca_sca) ; *)
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
 
@@ -541,7 +549,7 @@ let compute_bound_for_init_heap dot_basename get_edge_color ctx cfg i (init_ca_l
   let iteration = ref 1 in
   let result = ref CfgEdgeMap.empty in
   while !iteration > 0 do
-    Printf.printf "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
+    Debugger.info "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
 
     let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map in
     let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
@@ -635,16 +643,15 @@ let def_get_color _ = 0
 
 (** [compute_bounds initial_locs_with_constraints cfg] computes bounds on [cfg] with initial locations given by [inital_locs_with_constraints]
  
-    [~dot_basename] gives an optional name for outputting [.dot] files.
     [~get_edge_color] defines an optional color map, mapping edge types to colors. *)
-let compute_bounds ?(dot_basename="") ?(get_edge_color=def_get_color) init_ca_locs_with_constraints cfg_not_precompiled =
+let compute_bounds ?(get_edge_color=def_get_color) init_ca_locs_with_constraints cfg_not_precompiled =
   let cfg = Cfg.precompile cfg_not_precompiled in
 
   (* Z3 context for constructing expressions *)
   let ctx = Z3.mk_context [] in
 
   (* Compute bounds for CFG edges per initial heap *)
-  let bounds_per_init_heap = List.mapi (compute_bound_for_init_heap dot_basename get_edge_color ctx cfg) init_ca_locs_with_constraints in
+  let bounds_per_init_heap = List.mapi (compute_bound_for_init_heap get_edge_color ctx cfg) init_ca_locs_with_constraints in
 
   (* For each initial heap, select max bound for each CFG edge *)
   let edge_bound_map = Cfg.G.fold_edges_e (fun (f,(_,et),t) edge_bound_map ->
@@ -653,14 +660,17 @@ let compute_bounds ?(dot_basename="") ?(get_edge_color=def_get_color) init_ca_lo
     CfgEdgeMap.add e (max_bound ctx bounds) edge_bound_map
   ) cfg CfgEdgeMap.empty in
 
-  print_edge_bound_map edge_bound_map ;
+  edge_bound_map
 
+let write_bound_dot edge_bound_map get_edge_color cfg_not_precompiled =
   (* write cfg w/ bounds to file file *)
   let module CfgDot = Cfg.G.Dot (struct
     type edge = Cfg.G.E.t
+    type vertex = Cfg.ploc
+    let pprint_vertex = string_of_int
     let color_edge = get_edge_color
     let pprint_edge_label (f,(stmts,e),t) = 
       let bound = CfgEdgeMap.find (f,e,t) edge_bound_map in
       Printf.sprintf "%s\n%s\n%s\n%s" (pprint_bound_asymp bound) (pprint_bound bound) (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
   end) in
-  CfgDot.write_dot cfg_not_precompiled dot_basename "cfg_bounded" ;
+  CfgDot.write_dot cfg_not_precompiled !Config.dot_basename "cfg_bounded" ;
