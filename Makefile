@@ -18,12 +18,12 @@ native:
 	$(OCB) codscost.native
 
 unit:
-	$(OCB) sca.native
-	./sca.native
+	$(OCB) unit.native
+	./unit.native
 
 e2e:
-	$(OCB) test.native
-	./test.native
+	$(OCB) e2e.native
+	./e2e.native
 
 doc:
 	$(OCB) doc/api.docdir/index.html
