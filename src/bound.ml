@@ -53,113 +53,15 @@ let max_bound ctx =
     | Bound e1, Bound e2 -> Bound (max_expr ctx e1 e2)
   ) (const_bound_0 ctx)
 
-let min_bound ctx = function
-  | [] -> const_bound_0 ctx
-  | l -> List.fold_left (fun min_bound bound ->
-    match min_bound, bound with
-    | Unbounded, _ -> bound
-    | _, Unbounded -> min_bound
-    | Bound e1, Bound e2 -> Bound (min_expr ctx e1 e2)
-  ) Unbounded l
-
-module Complexity = struct
-  type t = Const of int | Linear of string | Polynomial of (string * int) list | Unbounded | Unknown
-  let rank = function
-    | Const _      -> 10
-    | Linear _     -> 20
-    | Polynomial _ -> 30
-    | Unbounded    -> 99
-    | Unknown      -> failwith "Unknown is greater AND smaller than all others, thus has no rank"
-
-  let pprint = function
-    | Const i      -> Printf.sprintf "O(%d)" i
-    | Linear s     -> Printf.sprintf "O(%s)" s
-    | Polynomial l -> (match l with [ (id, pow) ] -> Printf.sprintf "O(%s^%d)" id pow | _ -> "???")
-    | Unbounded    -> "∞"
-    | Unknown      -> "???"
-
-  let compare a b op = match (a,b) with
-  | (Unknown,_) -> Unknown
-  | (_,Unknown) -> Unknown
-  | _ ->
-      if op (rank a) (rank b) then a
-      else if op (rank b) (rank a) then b
-      else failwith "not implemented"
-
-  let max a b = compare a b (>)
-  let min a b = compare a b (<)
-end
-
-let symbol_to_string e =
-  let open Z3 in
-  Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl e))
-
-let get_const e =
-  if Z3.Expr.is_numeral e then
-    Some (Complexity.Const (min (Z3.Arithmetic.Integer.get_int e) 1))
-  else if Z3.Expr.is_const e then
-    Some (Complexity.Linear (symbol_to_string e))
-  else
-    None
-
-let rec get_complexity_of_expr e =
-  let e = Z3.Expr.simplify e None in
-  (* e is an addition of a numeral, constant, or multiplication of a numeral and constants *)
-  match get_const e with
-  | Some c -> c
-  | None ->
-    if Z3.Arithmetic.is_add e then
-      let args = Z3.Expr.get_args e in
-      let last_arg = List.nth args ((List.length args) - 1) in
-      (* e is in sum-of-monomials format, so this is the highest degree term *)
-      match get_const last_arg with
-      | Some c -> c
-      | None ->
-        (* assume last_arg is a multiplication strip out possible constant in multiplication *)
-        if Z3.Arithmetic.is_mul last_arg then
-          let mul_args = Z3.Expr.get_args last_arg in
-          let constants = match mul_args with
-            | first_arg :: tail_arg ->
-                if Z3.Expr.is_numeral first_arg then
-                  List.fold_left (fun l arg -> (Z3.Expr.get_args arg) @ l) [] tail_arg
-                else
-                  mul_args
-            | [] -> assert false
-          in
-          let occ_map = List.fold_left (fun map symbol ->
-            let id = symbol_to_string symbol in
-            let occ = match VariableMap.find_opt id map with Some i -> i+1 | None -> 1 in
-            VariableMap.add id occ map
-          ) VariableMap.empty constants
-          in
-          Complexity.Polynomial (VariableMap.bindings occ_map)
-        else 
-          Complexity.Unknown
-    else if Z3.Boolean.is_ite e then
-      let ite_args = Z3.Expr.get_args e in
-      let comparison, term1, term2 = List.nth ite_args 0, List.nth ite_args 1, List.nth ite_args 2 in
-      if Z3.Arithmetic.is_le comparison then
-        let comparison_args = Z3.Expr.get_args comparison in
-        let comparison_arg1, comparison_arg2 = List.nth comparison_args 0, List.nth comparison_args 1 in
-        let minmax_op = 
-          if Z3.Expr.is_numeral comparison_arg1 && Z3.Expr.is_const comparison_arg2 then
-            Some Complexity.max
-          else if Z3.Expr.is_const comparison_arg1 && Z3.Expr.is_numeral comparison_arg2 then
-            Some Complexity.min
-          else
-            None
-        in
-        match minmax_op with
-        | None -> Complexity.Unknown
-        | Some minmax_op ->
-            minmax_op (get_complexity_of_expr term1) (get_complexity_of_expr term2)
-      else
-        Complexity.Unknown
-    else Complexity.Unknown
+let min_bound ctx b b' =
+  match b, b' with
+  | Unbounded, _ -> b'
+  | _, Unbounded -> b
+  | Bound e1, Bound e2 -> Bound (min_expr ctx e1 e2)
 
 let bound_complexity = function
   | Unbounded -> Complexity.Unbounded
-  | Bound e ->  get_complexity_of_expr e
+  | Bound e -> Complexity.of_z3_expr e
 
 let pprint_bound_asymp b = Complexity.pprint (bound_complexity b)
 

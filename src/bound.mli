@@ -8,11 +8,6 @@ module CfgEdgeMap : Map.S with type key = CfgEdge.t
 
 type cfg_edge_map = bound CfgEdgeMap.t
 
-module Complexity : sig
-  type t = Const of int | Linear of string | Polynomial of (string * int) list | Unbounded | Unknown
-  val pprint : t -> string
-end
-
 type var_abs_map = Apron.Interval.t Ca_vertex.VariableMap.t
 (** Map of variables to intervals. *)
 
