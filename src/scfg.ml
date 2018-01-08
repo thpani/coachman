@@ -106,6 +106,11 @@ module G (C:GConfig) = struct
     let g' = Imp.create () in
     iter_edges_e (fun edge -> Imp.add_edge_e g' edge) g ; g'
 
+  let filter_edge_e pred g =
+    fold_edges_e (fun edge g ->
+      if pred edge then add_edge_e g edge else g
+    ) g empty
+
   let scc_edges g = 
     let scc_list = scc_list g in
     List.fold_left (fun l2 scc_vertices ->
