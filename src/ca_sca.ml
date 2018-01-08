@@ -44,7 +44,7 @@ end)
 
 (** [abstract ctx transrel highest_prime var] returns a size-change operator [op] if [var' op var] is implied by [transrel]. [transrel] ranges over vars with highest prime [highest_prime]. *)
 let abstract ctx transrel highest_prime var =
-  let qf_lia = Config.get_qf_lia ctx in
+  let qf_lia = Config.get_qf_lia () in
   let s = Solver.mk_solver ctx qf_lia in
   let c = mk_const ctx var in
   let c' = mk_const' ctx highest_prime var in
