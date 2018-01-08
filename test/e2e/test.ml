@@ -8,11 +8,14 @@ open OUnit2
 let concat_path a b c =
   Filename.concat (Filename.concat a b) c
 
-let test component fn_prog fn_heap fn_summary fun_name exp _ =
+let test ?(ai=false) component fn_prog fn_heap fn_summary fun_name exp _ =
+  Config.use_ai := ai ;
   let fn_prog = concat_path "test/e2e" component fn_prog in
   let fn_heap = concat_path "test/e2e" component fn_heap in
   let fn_summary = Filename.concat "test/e2e" fn_summary in
-  let init_heaps, functions, summaries = Main.parse_input fn_prog fn_heap fn_summary in
+  let init_heaps = Main.parse_heap fn_heap in
+  let functions = Main.parse_program fn_prog in
+  let summaries = Main.parse_program fn_summary in
   let prog = List.assoc fun_name functions in
   let cfg_with_summaries, get_color = Main.sequentialize (fun_name, prog) summaries in
   let edge_bound_map = compute_bounds ~get_edge_color:get_color init_heaps cfg_with_summaries in
@@ -48,7 +51,7 @@ let suite_treiber = "Treiber" >::: [
       3, Scfg.effect_ID, 1, Complexity.Const 1 ;
       7, Scfg.E "pop"  , 1, Complexity.Const 1 ;
     ] ;
-  "push || G(push) " >:: test "treiber"
+  "push || G(push)" >:: test "treiber"
     "treiber_push.tiny" "treiber.heap" "treiber/treiber.summaries" "push" [
       0, Scfg.effect_ID, 3, Complexity.Const 1 ;
       3, Scfg.effect_ID, 4, Complexity.Linear "N" ;
@@ -96,20 +99,62 @@ let suite_ms = "Michael-Scott" >::: [
        7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
        7, Scfg.effect_ID,     2, Complexity.Const 0 ;
     ] ;
-  (* "enq || G(enq) nolag" >:: test "ms" *)
-  (*   "ms.tiny" "ms_nolag.heap" "ms/ms_enq.summaries" "enq" [ *)
-  (*      0, Scfg.effect_ID,     3, Complexity.Const 1 ; *)
-  (*      3, Scfg.effect_ID,     4, Complexity.Linear "N" ; *)
-  (*      4, Scfg.effect_ID,     5, Complexity.Linear "N" ; *)
-  (*      5, Scfg.effect_ID,     6, Complexity.Linear "N" ; *)
-  (*      5, Scfg.effect_ID,    13, Complexity.Linear "N" ; *)
-  (*     13, Scfg.effect_ID,     3, Complexity.Linear "N" ; *)
-  (*     13, Scfg.E "enq_swing", 3, Complexity.Linear "N" ; *)
-  (*      6, Scfg.effect_ID,     3, Complexity.Linear "N" ; *)
-  (*      6, Scfg.E "enq",       7, Complexity.Const 1 ; *)
-  (*      7, Scfg.E "enq_swing", 2, Complexity.Const 1 ; *)
-  (*      7, Scfg.effect_ID,     2, Complexity.Const 1 ; *)
-  (*   ] ; *)
+  "enq || G(enq) tail nolag" >: test_case ~length:(OUnitTest.Custom_length 350.) (
+    test ~ai:true "ms" "ms_enq.tiny" "ms.tail_nolag.heap" "ms/ms_enq.summaries" "enq" [
+       0, Scfg.effect_ID,     3, Complexity.Const 1 ;
+       3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
+       4, Scfg.effect_ID,     5, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,     6, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,    13, Complexity.Linear "N" ;
+      13, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+      13, Scfg.E "enq_swing", 3, Complexity.Linear "N" ;
+       6, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+       6, Scfg.E "enq",       7, Complexity.Const 1 ;
+       7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
+       7, Scfg.effect_ID,     2, Complexity.Const 1 ;
+    ] ) ;
+  "enq || G(enq) tail" >: test_case ~length:(OUnitTest.Custom_length 400.) (
+    test ~ai:true "ms" "ms_enq.tiny" "ms.tail.heap" "ms/ms_enq.summaries" "enq" [
+       0, Scfg.effect_ID,     3, Complexity.Const 1 ;
+       3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
+       4, Scfg.effect_ID,     5, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,     6, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,    13, Complexity.Linear "N" ;
+      13, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+      13, Scfg.E "enq_swing", 3, Complexity.Linear "N" ;
+       6, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+       6, Scfg.E "enq",       7, Complexity.Const 1 ;
+       7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
+       7, Scfg.effect_ID,     2, Complexity.Const 1 ;
+    ] ) ;
+  "enq || G(enq) nolag" >: test_case ~length:(OUnitTest.Custom_length 3000.) (
+    test ~ai:true "ms" "ms_enq.tiny" "ms_nolag.heap" "ms/ms_enq.summaries" "enq" [
+       0, Scfg.effect_ID,     3, Complexity.Const 1 ;
+       3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
+       4, Scfg.effect_ID,     5, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,     6, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,    13, Complexity.Linear "N" ;
+      13, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+      13, Scfg.E "enq_swing", 3, Complexity.Linear "N" ;
+       6, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+       6, Scfg.E "enq",       7, Complexity.Const 1 ;
+       7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
+       7, Scfg.effect_ID,     2, Complexity.Const 1 ;
+    ] ) ;
+  "enq || G(enq)" >: test_case ~length:(OUnitTest.Custom_length 3000.) (
+    test ~ai:true "ms" "ms_enq.tiny" "ms.heap" "ms/ms_enq.summaries" "enq" [
+       0, Scfg.effect_ID,     3, Complexity.Const 1 ;
+       3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
+       4, Scfg.effect_ID,     5, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,     6, Complexity.Linear "N" ;
+       5, Scfg.effect_ID,    13, Complexity.Linear "N" ;
+      13, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+      13, Scfg.E "enq_swing", 3, Complexity.Linear "N" ;
+       6, Scfg.effect_ID,     3, Complexity.Linear "N" ;
+       6, Scfg.E "enq",       7, Complexity.Const 1 ;
+       7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
+       7, Scfg.effect_ID,     2, Complexity.Const 1 ;
+    ] ) ;
   "deq (empty) nolag" >:: test "ms"
     "ms.tiny" "ms_nolag.heap" "empty.summaries" "deq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
@@ -176,7 +221,10 @@ let suite_ms = "Michael-Scott" >::: [
     ] ;
 ]
 
+let e2e_tests = "e2e tests" >::: [ suite_treiber ; suite_ms ]
+
 let () =
   Debugger.current_level := Debugger.Error ;
-  run_test_tt_main suite_treiber ;
-  run_test_tt_main suite_ms
+  run_test_tt_main e2e_tests
+  (* run_test_tt_main suite_treiber ; *)
+  (* run_test_tt_main suite_ms *)
