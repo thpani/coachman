@@ -82,12 +82,13 @@ let rec from_ast_bexpr = function
   | Ast.Neg a -> Neg (from_ast_bexpr a)
   | Ast.CAS _ -> raise (Invalid_argument "CAS should have been rewritten as atomic assume/assign")
 
-let rec from_ast_stmt = List.map (function
+let rec from_ast_stmt = function
   | Ast.Assume b -> Assume (from_ast_bexpr b)
   | Ast.Alloc p -> Alloc (from_ast_pexpr p)
   | Ast.Asgn (a, b) -> Asgn (from_ast_pexpr a, from_ast_pexpr b)
   | s -> raise (Invalid_argument (Printf.sprintf "%s should not appear as CFG stmt" (Ast.pprint_stmt s)))
-)
+
+let rec from_ast_seq = List.map from_ast_stmt
 
 let to_ast_pexpr = function
   | Null -> Ast.Null
@@ -170,7 +171,7 @@ let precompile cfg =
 
 (* Create CFG from AST {{{ *)
 
-let from_ast ast = 
+let of_ast ast = 
   let last = ref 0 in
   let break_target = ref 0 in
   let continue_target = ref 0 in
@@ -195,7 +196,7 @@ let from_ast ast =
           begin match if_guard with
             | Ast.Atomic s ->
                 let next_v = next_vertex g in
-                G.Imp.add_edge_e g (!last, (from_ast_stmt s, if_guard_effect), next_v) ; last := next_v
+                G.Imp.add_edge_e g (!last, (from_ast_seq s, if_guard_effect), next_v) ; last := next_v
             | _ -> gen_cfg [if_guard] 
           end ;
           did_goto := false ;
@@ -236,10 +237,10 @@ let from_ast ast =
           did_goto := true
       | Ast.Atomic stmt ->
         let next_v = next_vertex g in
-        G.Imp.add_edge_e g (!last, (from_ast_stmt stmt, Scfg.effect_ID), next_v) ; last := next_v
+        G.Imp.add_edge_e g (!last, (from_ast_seq stmt, Scfg.effect_ID), next_v) ; last := next_v
       | stmt ->
         let next_v = next_vertex g in
-        G.Imp.add_edge_e g (!last, (from_ast_stmt [stmt], Scfg.effect_ID), next_v) ; last := next_v
+        G.Imp.add_edge_e g (!last, (from_ast_seq [stmt], Scfg.effect_ID), next_v) ; last := next_v
     ) ast
   in
   gen_cfg ast ;
@@ -296,7 +297,7 @@ let from_ast ast =
 let add_summaries cfg summaries =
   List.fold_left (fun cfg (summary_name, stmts) ->
     let summary_seq = Ast.unwrap_atomic stmts in
-    let summary_nested_list = from_ast_stmt summary_seq in
+    let summary_nested_list = from_ast_seq summary_seq in
     G.fold_vertex (fun v cfg ->
       G.add_edge_e cfg (v, (summary_nested_list, Scfg.S summary_name), v)
     ) cfg cfg
