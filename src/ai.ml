@@ -212,11 +212,14 @@ let absv_rel man env absv (expr, highest_prime) =
 let do_abstract_computation man env init_abs_map cfg =
   let vars, _ = Environment.vars env in
   let q = Queue.create() in
-  (* print_abs_map man env !abs_map cfg ; *)
   G.iter_vertex (fun v -> Queue.add v q) cfg ;
-  let abs_map = ref (G.fold_vertex (fun v abs_map ->
-    VertexMap.add v (Abstract1.bottom man env) abs_map) cfg VertexMap.empty)
+  let init_abs_map = match init_abs_map with
+    | Some abs_map -> abs_map
+    | None -> G.fold_vertex (fun vertex abs_map ->
+      VertexMap.add vertex (Abstract1.bottom man env) abs_map
+    ) cfg VertexMap.empty
   in
+  let abs_map = ref init_abs_map in
   try begin
     while not (Queue.is_empty q) do
       let vertex = Queue.pop q in
@@ -243,11 +246,11 @@ let do_abstract_computation man env init_abs_map cfg =
       abs_map := VertexMap.add vertex new_absv !abs_map ;
       (* print_abs_map man env !abs_map cfg ; *)
     done ;
-    man, env, !abs_map
+    !abs_map
   end
   with Manager.Error e -> Printf.eprintf "ERROR: %s; %s\n" e.Apron.Manager.msg (Manager.string_of_funid e.Apron.Manager.funid) ; raise (Manager.Error e)
 
-let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
+let get_init_absv init_ca_loc constraints vars cfg =
   (* let pprint_constr = List.iter (fun (var, itvl) -> *)
   (*   Format.printf "%s |-> %a@." var Interval.print itvl *)
   (* ) in *)
@@ -279,11 +282,8 @@ let do_abstract_computation_initial_values init_ca_loc constraints vars cfg =
     VertexMap.add current_cloc absv map
   ) cfg VertexMap.empty
   in
-  (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
-  let man, env, abs_map = do_abstract_computation man env abs_map cfg in
-  (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
-  (* print_abs_map man env abs_map cfg ; *)
   man, env, abs_map
+  (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
 
 (* }}} *)
 
