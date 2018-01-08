@@ -146,5 +146,18 @@ module G (C:GConfig) = struct
     | [] -> empty
     | [ edges ] -> List.fold_left (fun g edge -> add_edge_e g edge) empty edges
     | _ -> assert false
-    
+
+  let all_paths g vfrom vto =
+    let rec loop g vfrom prefix =
+      if List.exists (C.equal_vertex vfrom) vto then
+        [ List.rev prefix, vfrom ]
+      else
+        List.concat (
+          List.map (fun edge ->
+            let _,_,v' = edge in
+            loop g v' (edge :: prefix)
+          ) (succ_e g vfrom)
+        )
+    in
+    loop g vfrom []
 end
