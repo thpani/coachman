@@ -74,7 +74,7 @@ module Complexity = struct
   let pprint = function
     | Const i      -> Printf.sprintf "O(%d)" i
     | Linear s     -> Printf.sprintf "O(%s)" s
-    | Polynomial l -> (match l with [ (id, pow) ] -> Printf.sprintf "%s^%d" id pow | _ -> "???")
+    | Polynomial l -> (match l with [ (id, pow) ] -> Printf.sprintf "O(%s^%d)" id pow | _ -> "???")
     | Unbounded    -> "∞"
     | Unknown      -> "???"
 
