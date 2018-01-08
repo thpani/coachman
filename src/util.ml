@@ -43,7 +43,7 @@ module Z3 = struct
   (** [check ctx f] checks [f] for validity. *)
   let check_valid ctx f =
     let sat_problem = Boolean.mk_not ctx f in
-    let qf_lia = Config.get_qf_lia ctx in
+    let qf_lia = Config.get_qf_lia () in
     let s = Solver.mk_solver ctx qf_lia in
     Solver.add s [ sat_problem ] ;
     (Solver.check s []) = Solver.UNSATISFIABLE
