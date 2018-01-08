@@ -67,7 +67,7 @@ let error_sink =
   let error_ploc = -99 in
   error_ploc, { nodes = NodeSet.empty ; succ = NodeMap.empty ; var = VariableMap.empty }
 
-let rec get_next (lfrom, hfrom) stmts lto =
+let rec get_next (lfrom, hfrom) stmts summary lto =
   let rec simplify_guard = let open Cfg in
     let var_eq a b =
       let get_node = function
@@ -108,7 +108,7 @@ let rec get_next (lfrom, hfrom) stmts lto =
   if equal (lfrom, hfrom) error_sink then
     [ [Assume True], error_sink ]
   else match stmts with
-  | [ s ] -> begin match s with
+  | [ s ] -> ( match s with
     | Cfg.Alloc Cfg.Null                -> raise (Invalid_argument "null is not a valid lvalue")
     | Cfg.Alloc(Cfg.Next _)             -> raise (Invalid_argument "allocation of .next not implemented")
     | Cfg.Asgn (Cfg.Null, _)            -> raise (Invalid_argument "null is not a valid lvalue")
@@ -279,34 +279,26 @@ let rec get_next (lfrom, hfrom) stmts lto =
       | true -> [ [ Assume True ], (lto, hfrom) ]
       | false -> [ [ Assume False ], (lto, hfrom) ]
     )
-  end
-    | stmts -> (* atomic sequence of statements *)
-      Debugger.debug "ca_construction" "  ATOMIC TRANSITION COMPUTATION:\n" ;
-      let cfg = Cfg.from_ast (Cfg.to_ast_stmt stmts) in
-      let bicfg = from_cfg ~indent:2 ~introduce_assume_false:true cfg (0,hfrom) in
-      let final_vertices = G.fold_vertex (fun v l -> match G.succ bicfg v with [] -> v :: l | _ -> l) bicfg [] in
-      let paths = List.map (fun final -> 
-        let ploc, heap = final in
-        let module W = struct
-          type edge = G.E.t
-          type t = int
-          let weight _ = 1
-          let compare = Pervasives.compare
-          let add = (+)
-          let zero = 0
-        end in
-        let module Dijkstra = Graph.Path.Dijkstra(G)(W) in
-        let path, _ = Dijkstra.shortest_path bicfg (0, hfrom) final in
-        let var = VariableMap.filter (fun v n -> not (Str.string_match (Str.regexp "^__") v 0)) heap.var in
-        let heap = { nodes = heap.nodes ; succ = heap.succ ; var } in
-        path, (ploc, heap)
-      ) final_vertices in
-      let paths_seq = List.map (fun (path, (ploc, heap)) ->
-        List.concat (List.map (fun (_, (stmt,_), _) -> stmt) path),
-        if equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
-      ) paths in
-      paths_seq
-and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
+  )
+  | stmts -> (* atomic sequence of statements *)
+    Debugger.debug "ca_construction" "  ATOMIC TRANSITION COMPUTATION: %s\n" (Scfg.pprint_edge_kind summary);
+    let cfg = Cfg.of_ast (Cfg.to_ast_stmt stmts) in
+    let bicfg = of_cfg ~indent:2 ~introduce_assume_false:true cfg (0,hfrom) in
+    (* Make sure the atomic CA is loop-free *)
+    assert ((fst(G.scc bicfg)) = (G.nb_vertex bicfg)) ;
+    let final_vertices = G.fold_vertex (fun v l -> match G.succ bicfg v with [] -> v :: l | _ -> l) bicfg [] in
+    let paths_final_v = G.all_paths bicfg (0, hfrom) final_vertices in
+    let paths = List.map (fun (path, (ploc, heap)) ->
+      let var = VariableMap.filter (fun v n -> not (Str.string_match (Str.regexp "^__") v 0)) heap.var in
+      let heap = { nodes = heap.nodes ; succ = heap.succ ; var } in
+      path, (ploc, heap)
+    ) paths_final_v in
+    let paths_seq = List.map (fun (path, (ploc, heap)) ->
+      List.fold_right (fun (_, (stmts,_), _) seq -> stmts @ seq) path [],
+      if equal (ploc,heap) error_sink then (ploc, heap) else (lto, heap)
+    ) paths in
+    paths_seq
+and of_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
   (* Rationale for `introduce_assume_false':
    * For ordinary CA construction, it makes no sense to follow atomic statements
    * that include an `assume(false)' and `introduce_assume_false' should be kept
@@ -350,7 +342,7 @@ and from_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
     let from, from_heap = from_vertex in
     Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
       Debugger.debug "ca_construction" "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (pprint from_vertex) ;
-      let translated = get_next from_vertex stmt to_ in
+      let translated = get_next from_vertex stmt summary to_ in
       List.iter (fun (tstmt, (to_, to_heap)) ->
         let has_assume_false = List.mem (Assume False) tstmt in
         if has_assume_false && not introduce_assume_false then ()
