@@ -138,9 +138,9 @@ module G (C:GConfig) = struct
     let scc_edges = List.concat (scc_edges g) in
     List.exists (equal_edge edge) scc_edges
 
-  let scc_of_cfg_edge g f t et =
+  let scc_of_edge g f t et =
     let scc = List.filter (fun scc_edges ->
-      List.exists (fun (v,(_,e),v') -> (C.get_ploc v)=f && (C.get_ploc v')=t && e = et) scc_edges
+      List.exists (fun (v,(_,e),v') -> C.equal_vertex v f && C.equal_vertex v' t && e = et) scc_edges
     ) (scc_edges g) in
     match scc with
     | [] -> empty
