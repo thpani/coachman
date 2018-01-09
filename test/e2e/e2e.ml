@@ -99,7 +99,7 @@ let suite_ms = "Michael-Scott" >::: [
        7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
        7, Scfg.effect_ID,     2, Complexity.Const 0 ;
     ] ;
-  "enq || G(enq) tail nolag" >: test_case ~length:(OUnitTest.Custom_length 350.) (
+  "enq || G(enq) tail nolag" >: test_case ~length:(OUnitTest.Custom_length 400.) (
     test ~ai:true "ms" "ms_enq.tiny" "ms.tail_nolag.heap" "ms/ms_enq.summaries" "enq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
@@ -113,7 +113,7 @@ let suite_ms = "Michael-Scott" >::: [
        7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
        7, Scfg.effect_ID,     2, Complexity.Const 1 ;
     ] ) ;
-  "enq || G(enq) tail" >: test_case ~length:(OUnitTest.Custom_length 400.) (
+  "enq || G(enq) tail" >: test_case ~length:(OUnitTest.Custom_length 500.) (
     test ~ai:true "ms" "ms_enq.tiny" "ms.tail.heap" "ms/ms_enq.summaries" "enq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
@@ -127,7 +127,7 @@ let suite_ms = "Michael-Scott" >::: [
        7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
        7, Scfg.effect_ID,     2, Complexity.Const 1 ;
     ] ) ;
-  "enq || G(enq) nolag" >: test_case ~length:(OUnitTest.Custom_length 3000.) (
+  "enq || G(enq) nolag" >: test_case ~length:(OUnitTest.Custom_length 4000.) (
     test ~ai:true "ms" "ms_enq.tiny" "ms_nolag.heap" "ms/ms_enq.summaries" "enq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
@@ -141,7 +141,7 @@ let suite_ms = "Michael-Scott" >::: [
        7, Scfg.E "enq_swing", 2, Complexity.Const 1 ;
        7, Scfg.effect_ID,     2, Complexity.Const 1 ;
     ] ) ;
-  "enq || G(enq)" >: test_case ~length:(OUnitTest.Custom_length 3000.) (
+  "enq || G(enq)" >: test_case ~length:(OUnitTest.Custom_length 3500.) (
     test ~ai:true "ms" "ms_enq.tiny" "ms.heap" "ms/ms_enq.summaries" "enq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
