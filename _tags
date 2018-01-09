@@ -1,2 +1,2 @@
-true: package(ocamlgraph), package(str), package(apron), package(apron.boxMPQ), package(z3)
+true: package(ocamlgraph), package(str), package(apron), package(apron.boxMPQ), package(Z3)
 <test/**>: package(ounit)
