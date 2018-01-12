@@ -30,7 +30,7 @@ doc:
 	$(OCB) doc/api.docdir/api.dot
 
 install: native
-	install -m 0755 our_program codscost.native $(prefix)/bin/codscost
+	install -m 0755 codscost.native $(prefix)/bin/codscost
 
 test: $(TREIBER) $(MS)
 
