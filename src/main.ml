@@ -41,7 +41,7 @@ let sequentialize (fun_name, ast) summaries =
 
 let main () =
   let args = ref [] in
-  let usage = "<prog> <heap> <summaries>" in
+  let usage = "Usage: codscost [args] <prog> <heap> <summaries>" in
   Arg.parse [
     "-debug", Arg.String (fun s ->
       Debugger.current_level := Debugger.Debug ;
@@ -68,4 +68,4 @@ let main () =
       Bound.print_edge_bound_map edge_bound_map ;
       Bound.write_bound_dot edge_bound_map get_color cfg_with_summaries
     ) functions
-  | _ -> prerr_string usage ; exit 1
+  | _ -> prerr_endline usage ; exit 1
