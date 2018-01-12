@@ -10,17 +10,32 @@ module EnvBoundMap = Util.DS.IdentifierMap
 type var_abs_map = Apron.Interval.t VariableMap.t
 type ca_loc_with_constraints = Ca_vertex.ca_loc * var_abs_map
 
-module Candidate = struct
-  type bound = Const of int | Var of VariableSet.t * int option VariableMap.t | Unbounded
+module Rank = struct
+  type t = Const of int | Var of VariableSet.t * int option VariableMap.t | Unbounded
 end
 
-type bound = Bound of Z3.Expr.expr | Unbounded
+type t = Bound of Z3.Expr.expr | Unbounded
+
+let pprint = function
+  | Bound e -> Z3.Expr.to_string (Z3.Expr.simplify e None)
+  | Unbounded -> "∞"
 
 let const_bound ctx i = Bound (Util.Z3.mk_numeral ctx i)
 let const_bound_0 ctx = const_bound ctx 0
 let const_bound_1 ctx = const_bound ctx 1
 
-(* Simplify max expressions so we don't have lots of its in the bound expression *)
+(* Conversion to asymptotic complexity {{{ *)
+
+let to_complexity = function
+  | Unbounded -> Complexity.Unbounded
+  | Bound e -> Complexity.of_z3_expr e
+
+let pprint_bound_asymp b = Complexity.pprint (to_complexity b)
+
+(* }}} *)
+
+(* Simplify max/min ite expressions {{{ *)
+
 let max_expr ctx a b =
   let open Z3 in
   let ngt0 = Arithmetic.mk_gt ctx (Z3.mk_const ctx "N") (Z3.mk_numeral ctx 1) in
@@ -59,16 +74,11 @@ let min_bound ctx b b' =
   | _, Unbounded -> b
   | Bound e1, Bound e2 -> Bound (min_expr ctx e1 e2)
 
-let bound_complexity = function
-  | Unbounded -> Complexity.Unbounded
-  | Bound e -> Complexity.of_z3_expr e
+(* }}} *)
 
-let pprint_bound_asymp b = Complexity.pprint (bound_complexity b)
+(* Invariants on upper bound variables {{{ *)
 
-let pprint_bound = function
-  | Bound e -> Z3.Expr.to_string (Z3.Expr.simplify e None)
-  | Unbounded -> "∞"
-
+(** [itvl_width itvl] returns [None] if the interval is bottom, otherwise [Some w] where [w] is [upper(itvl)-lower(itvl)]. *)
 let itvl_width itvl =
   let lower, upper = itvl.Apron.Interval.inf, itvl.Apron.Interval.sup in
   if (Apron.Scalar.is_infty lower) <> 0 || (Apron.Scalar.is_infty upper) <> 0 then
@@ -80,6 +90,8 @@ let itvl_width itvl =
     let upper = int_of_string (Mpqf.to_string upper) in
     Some (upper - lower)
 
+(** [get_ub_invariant var scc abs_map] returns the greatest width of intervals
+  * in the domain of [abs_map], mapping vertices in [scc] to abstract values. *)
 let get_ub_invariant var scc abs_map =
   Ca_seq.G.fold_vertex (fun vertex greatest_width ->
     match greatest_width with
@@ -90,14 +102,19 @@ let get_ub_invariant var scc abs_map =
       let man = Apron.Abstract1.manager absv in
       let itvl = Apron.Abstract1.bound_variable man absv apron_var in
       match itvl_width itvl with
-      | None -> None
+      | None -> Some greatest_width
       | Some this_width -> Some (max greatest_width this_width)
   ) scc (Some 0)
 
+(** [get_ub_invariant_vars ranking_vars scc abs_map] returns a map from
+  * variables in [ranking_vars] to greatest interval widths according to
+  * [abs_map] on vertices from [scc]. *)
 let get_ub_invariant_vars ranking_vars scc abs_map =
   VariableSet.fold (fun v ub_map ->
     VariableMap.add v (get_ub_invariant v scc abs_map) ub_map
   ) ranking_vars VariableMap.empty
+
+(* }}} *)
 
 let ca_edge_eq (f,(_,k),t) (f',k',t') = k = k' && Ca_vertex.equal f f' && Ca_vertex.equal t t'
 
@@ -133,7 +150,7 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
       if not (Ca_seq.G.edge_in_scc edge ca_seq) then
         begin
           Debugger.debug "local_bound" "outside SCC. Const.\n" ;
-          Candidate.Const 1
+          Rank.Const 1
         end
       else
         let ranking_vars = VariableSet.filter (fun var ->
@@ -148,7 +165,7 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
             let scc_seq = Ca_seq.G.scc_of_edge ca_seq f t k in
             let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map_ca in
             Debugger.debug "local_bound" "ranked by %s.\n" (VariableSet.pprint ranking_vars) ;
-            Candidate.Var (ranking_vars, inv_ranking_vars)
+            Rank.Var (ranking_vars, inv_ranking_vars)
           end
         else
           begin
@@ -168,12 +185,12 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
                   let scc_seq = Ca_seq.G.scc_of_edge ca_seq f t k in
                   let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map_ca in
                   Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (VariableSet.pprint ranking_vars) ;
-                  Candidate.Var (ranking_vars, inv_ranking_vars)
+                  Rank.Var (ranking_vars, inv_ranking_vars)
                 end
               else
                 begin
                   Debugger.debug "local_bound" "Unbounded.\n" ;
-                  Candidate.Unbounded
+                  Rank.Unbounded
                 end
             else (* use AI *)
               let ranking_vars = VariableSet.filter (fun var ->
@@ -199,12 +216,12 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
                   let scc_seq = Ca_seq.G.scc_of_edge ca_seq f t k in
                   let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map_ca in
                   Debugger.debug "local_bound" "Vars breaking SCC with AI pruning: %s\n" (VariableSet.pprint ranking_vars) ;
-                  Candidate.Var (ranking_vars, inv_ranking_vars)
+                  Rank.Var (ranking_vars, inv_ranking_vars)
                 end
               else
                 begin
                   Debugger.debug "local_bound" "Unbounded.\n" ;
-                  Candidate.Unbounded
+                  Rank.Unbounded
                 end
           end
     in
@@ -227,7 +244,7 @@ let pprint_env_bound_map ctx map =
     Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
     Bound (Z3.Expr.simplify expr (Some params))
   in
-  Printf.sprintf "%s = %s" (summary_ctr summary_name) (pprint_bound bound)
+  Printf.sprintf "%s = %s" (summary_ctr summary_name) (pprint bound)
 ) (EnvBoundMap.bindings map))
 
 let minimal_hitting_set_approx var_sets =
@@ -298,7 +315,7 @@ let min_bound_vars ctx env_bound_map self_loop var_set inv =
 let fold_bounds ctx env_bound_map local_bounds_per_scc self_loop =
   let const, unbounded, var_sets, invs =
     List.fold_left (fun (const, unbounded, var_sets, invs) bound ->
-      let open Candidate in match bound with
+      let open Rank in match bound with
       | Const i            -> const + i, unbounded, var_sets           , invs
       | Unbounded          -> const    , true     , var_sets           , invs
       | Var (var_set, inv) -> const    , unbounded, var_set :: var_sets, inv :: invs
@@ -402,12 +419,12 @@ module CfgEdge = struct
   let compare = Pervasives.compare
 end
 module CfgEdgeMap = Map.Make(CfgEdge)
-type cfg_edge_map = bound CfgEdgeMap.t
+type cfg_edge_map = t CfgEdgeMap.t
 
 (** Print edge bound map *)
 let print_edge_bound_map =
   CfgEdgeMap.iter (fun (f,et,t) local_bounds ->
-    Debugger.info "bound" "%s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint_bound local_bounds)
+    Debugger.info "bound" "%s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint local_bounds)
 )
 
 let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constraints) =
@@ -566,7 +583,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
               else
                 const_bound_1 ctx
         in
-        (* Debugger.debug "bound" "folded bound for %s: %s\n" (Cfg.pprint_edge edge) (pprint_bound edge_bound) ; *)
+        (* Debugger.debug "bound" "folded bound for %s: %s\n" (Cfg.pprint_edge edge) (pprint edge_bound) ; *)
         let bound_map = match edge_type with
         | Scfg.E effect_name -> 
             (* the edge is bounded by `bound'; multiply by (N-1) *)
@@ -670,6 +687,6 @@ let write_bound_dot edge_bound_map get_edge_color cfg_not_precompiled =
     let color_edge = get_edge_color
     let pprint_edge_label (f,(stmts,e),t) = 
       let bound = CfgEdgeMap.find (f,e,t) edge_bound_map in
-      Printf.sprintf "%s\n%s\n%s\n%s" (pprint_bound_asymp bound) (pprint_bound bound) (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
+      Printf.sprintf "%s\n%s\n%s\n%s" (pprint_bound_asymp bound) (pprint bound) (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
   end) in
   CfgDot.write_dot cfg_not_precompiled !Config.dot_basename "cfg_bounded" ;

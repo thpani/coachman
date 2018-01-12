@@ -1,13 +1,6 @@
 type t = Const of int | Linear of string | Polynomial of (string * int) list | Unbounded | Unknown
 
 
-let ord = function
-  | Const _      -> 10
-  | Linear _     -> 20
-  | Polynomial _ -> 30
-  | Unbounded    -> 99
-  | Unknown      -> failwith "Unknown is greater AND smaller than all others, thus has no ord"
-
 let pprint = function
   | Const i      -> Printf.sprintf "O(%d)" i
   | Linear s     -> Printf.sprintf "O(%s)" s
@@ -15,16 +8,27 @@ let pprint = function
   | Unbounded    -> "∞"
   | Unknown      -> "???"
 
+(* Comparison functions {{{ *)
+
+let ord = function
+  | Const _      -> 10
+  | Linear _     -> 20
+  | Polynomial _ -> 30
+  | Unbounded    -> 99
+  | Unknown      -> failwith "Unknown is greater AND smaller than all others, thus has no ord"
+
 let compare a b op = match (a,b) with
 | (Unknown,_) -> Unknown
 | (_,Unknown) -> Unknown
 | _ ->
     if op (ord a) (ord b) then a
     else if op (ord b) (ord a) then b
-    else failwith "not implemented"
+    else failwith "Comparison of complexities with equal ord not implemented"
 
 let max a b = compare a b (>)
 let min a b = compare a b (<)
+
+(* }}} *)
 
 module VariableMap = Util.DS.IdentifierMap
 
