@@ -14,6 +14,7 @@ RUN cd build && opam config exec -- make
 RUN cd build && opam config exec -- sudo make install
 
 WORKDIR /home/opam
+ARG CACHEBUST=1
 RUN git clone https://github.com/thpani/codscost.git
 RUN opam pin add -n codscost /home/opam/codscost
 RUN opam depext codscost

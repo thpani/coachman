@@ -3,9 +3,8 @@ name: "l2ca"
 version: "~unknown"
 maintainer: "Thomas Pani <thomas.pani@gmail.com>"
 authors: "Thomas Pani <thomas.pani@gmail.com>"
-build: [
-  [make]
-]
+build: make
+install: [make "install"]
 depends: [
   "ocamlfind" {build} "ocamlgraph" "apron"
 ]
