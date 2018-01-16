@@ -17,6 +17,9 @@ clean:
 native:
 	$(OCB) codscost.native
 
+profile:
+	$(OCB) -tag profile codscost.native
+
 unit:
 	$(OCB) unit.native
 	./unit.native
