@@ -22,7 +22,7 @@ let test ?(ai=false) component fn_prog fn_heap fn_summary fun_name exp _ =
   List.iter (fun (f,ek,t,exp) ->
     try
       let bound = CfgEdgeMap.find (f,ek,t) edge_bound_map in
-      let complexity = bound_complexity bound in
+      let complexity = Bound.to_complexity bound in
       let msg = Printf.sprintf "%s actual: %s != expected: %s"
         (Cfg.G.pprint_cfg_edge (f,ek,t))
         (Complexity.pprint complexity)

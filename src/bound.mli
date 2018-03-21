@@ -22,3 +22,6 @@ val compute_bounds : ?get_edge_color:Util.Colormap.t -> ca_loc_with_constraints 
 val print_edge_bound_map : cfg_edge_map -> unit
 
 val write_bound_dot : cfg_edge_map -> Util.Colormap.t -> Cfg.G.t -> unit
+
+(* this is here for test/e2e/e2e.ml *)
+val to_complexity : t -> Complexity.t
