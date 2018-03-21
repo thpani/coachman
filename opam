@@ -6,5 +6,5 @@ authors: "Thomas Pani <thomas.pani@gmail.com>"
 build: make
 install: [make "prefix=%{prefix}%" "install"]
 depends: [
-  "ocamlfind" {build} "ocamlgraph" "apron"
+  "ocamlfind" {build} "apron" "ocamlgraph" "z3"
 ]
