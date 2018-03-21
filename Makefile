@@ -3,7 +3,7 @@ OCB = ocamlbuild $(OCB_FLAGS)
 
 TREIBER_FUNCS := emp pop push
 TREIBER := testt $(foreach func,$(TREIBER_FUNCS),testt_$(func))
-MS_FUNCS := emp deq enq
+MS_FUNCS := emp deq enq enq_tail
 MS_FUNCS_PREFIXED := $(foreach func,$(MS_FUNCS),testms_$(func))
 MS := testms $(MS_FUNCS_PREFIXED) $(foreach func,$(MS_FUNCS_PREFIXED),$(func)_nolag)
 
