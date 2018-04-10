@@ -81,8 +81,8 @@ module G (C:GConfig) = struct
       output_graph chout g ; close_out chout
   end
 
-  let pprint_cfg_edge (v,et,v') = Printf.sprintf "%s: %d -> %d"
-    (pprint_edge_kind et) (C.get_ploc v) (C.get_ploc v')
+  let pprint_cfg_edge (v,et,v') = Printf.sprintf "%d -> %d (%s)"
+      (C.get_ploc v) (C.get_ploc v') (pprint_edge_kind et)
 
   let pprint_edge (v,(_,et),v') = Printf.sprintf "%s: %s -> %s"
     (pprint_cfg_edge (v,et,v')) (C.pprint_vertex v) (C.pprint_vertex v')

@@ -233,9 +233,9 @@ let summary_ctr summary_name = Printf.sprintf "summary_ctr_%s" summary_name
 let is_summary_ctr id = Str.string_match (Str.regexp "^summary_ctr_\\(.*\\)") id 0
 let get_summary_of_summary_ctr id =
   if is_summary_ctr id then Some (Str.matched_group 1 id)
-  else None 
+  else None
 
-let pprint_env_bound_map ctx map = 
+let pprint_env_bound_map ctx map =
   String.concat "; " (List.map (fun (summary_name, bound) ->
   let bound = match bound with
   | Unbounded -> Unbounded
@@ -380,15 +380,15 @@ let refine_init_constraints_with_env_bounds constraints env_bound_map =
 
 (** For bounded CA summary edges, add decrement statement of the summary_counter *)
 let refine_ca_with_env_bounds ca env_bound_map =
-  let env_counter_stmt edge_type = 
+  let env_counter_stmt edge_type =
     match edge_type with
-    | Scfg.S summary_name -> 
+    | Scfg.S summary_name ->
         let bound = EnvBoundMap.find summary_name env_bound_map in
         let summary_ctr = summary_ctr summary_name in
-        if bound <> Unbounded then 
+        if bound <> Unbounded then
           let open Ca_seq in
           [ Asgn (summary_ctr, Add (summary_ctr, Num (-1))) ]
-        else [] 
+        else []
     | _ -> []
   in
   Ca_seq.G.fold_edges_e (fun (from, (stmts, edge_type), to_) ca_rel ->
@@ -422,13 +422,22 @@ module CfgEdgeMap = Map.Make(CfgEdge)
 type cfg_edge_map = t CfgEdgeMap.t
 
 (** Print edge bound map *)
-let print_edge_bound_map =
+let print_edge_bound_map map =
   CfgEdgeMap.iter (fun (f,et,t) local_bounds ->
-    Debugger.info "bound" "%s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint local_bounds)
-)
+      match et with
+      | E _ ->
+        Debugger.info "bound" "  %s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint local_bounds)
+      | _ -> ()
+    ) map ;
+   CfgEdgeMap.iter (fun (f,et,t) local_bounds ->
+      match et with
+      | S _ ->
+        Debugger.info "bound" "  %s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint local_bounds)
+      | _ -> ()
+  ) map
 
 let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constraints) =
-  Debugger.info "bound" "# Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
+  Debugger.info "bound" "Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
 
   (* setup dot output *)
   let dot_basename = Printf.sprintf "%s_heap%d" !Config.dot_basename i in
@@ -561,7 +570,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
       if f'=f && t'=t && ek' = ek then lb :: l else l
     ) [] ca_local_bound_map in
 
-    let edge_bound_map, summary_bounds_map = 
+    let edge_bound_map, summary_bounds_map =
       Cfg.G.fold_edges_e (fun edge (acc_edge_bound_map, acc_env_bound_map) ->
         let f, (_,edge_type), t = edge in
         (* For edge f->t, get a list of local bounds (at most one for each f->t edge in the CA) *)
@@ -585,7 +594,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
         in
         (* Debugger.debug "bound" "folded bound for %s: %s\n" (Cfg.pprint_edge edge) (pprint edge_bound) ; *)
         let bound_map = match edge_type with
-        | Scfg.E effect_name -> 
+        | Scfg.E effect_name ->
             (* the edge is bounded by `bound'; multiply by (N-1) *)
             let add_effect_bound = multiply_by_env_num ctx edge_bound in
             let new_bound_list = match EnvBoundMap.find_opt effect_name acc_env_bound_map with
@@ -650,19 +659,19 @@ let get_numeral_opt e = if Z3.Expr.is_numeral e then Some (get_numeral e) else N
 let default_get_color _ = 0
 
 (** [compute_bounds initial_locs_with_constraints cfg] computes bounds on [cfg] with initial locations given by [inital_locs_with_constraints]
- 
+
     [~get_edge_color] defines an optional color map, mapping edge types to colors. *)
 let compute_bounds ?(get_edge_color=default_get_color) init_ca_locs_with_constraints cfg_not_precompiled =
   let cfg = Cfg.precompile cfg_not_precompiled in
   let module CfgDot = Cfg.G.Dot (struct
-    type edge = Cfg.G.E.t
-    type vertex = Cfg.ploc
-    let pprint_vertex = string_of_int
-    let color_edge = get_edge_color
-    let pprint_edge_label (f,(stmts,e),t) = 
-      Printf.sprintf "%s\n%s" (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
-  end) in
-    CfgDot.write_dot cfg "cfg" "cfg" ;
+      type edge = Cfg.G.E.t
+      type vertex = Cfg.ploc
+      let pprint_vertex = string_of_int
+      let color_edge = get_edge_color
+      let pprint_edge_label (f,(stmts,e),t) =
+        Printf.sprintf "%s\n%s" (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
+    end) in
+  CfgDot.write_dot cfg_not_precompiled !Config.dot_basename "cfg" ;
 
   let ctx = Config.get_ctx () in
 
@@ -685,7 +694,7 @@ let write_bound_dot edge_bound_map get_edge_color cfg_not_precompiled =
     type vertex = Cfg.ploc
     let pprint_vertex = string_of_int
     let color_edge = get_edge_color
-    let pprint_edge_label (f,(stmts,e),t) = 
+    let pprint_edge_label (f,(stmts,e),t) =
       let bound = CfgEdgeMap.find (f,e,t) edge_bound_map in
       Printf.sprintf "%s\n%s\n%s\n%s" (pprint_bound_asymp bound) (pprint bound) (Cfg.pprint_seq stmts) (Scfg.pprint_edge_kind e)
   end) in
