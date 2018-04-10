@@ -45,10 +45,9 @@ module G (C:GConfig) = struct
   module E_ = struct
     type t = C.edge_label * edge_kind
     let compare (e1,ek1) (e2,ek2) =
-      if ek1 = ek2 then
-        C.compare_edge_label e1 e2
-      else 
-        Pervasives.compare e1 e2
+      match Pervasives.compare ek1 ek2 with
+      | 0 -> C.compare_edge_label e1 e2
+      | n -> n
     let default = C.default_edge_label, effect_ID
   end
 
