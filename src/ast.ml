@@ -10,6 +10,7 @@ type pexpr =
 type bexpr =
   | True
   | False
+  | Nondet
   | Eq of pexpr * pexpr
   | Neg of bexpr
   | CAS of pexpr * identifier * identifier * identifier
@@ -40,6 +41,7 @@ let pprint_pexpr = function
 let rec pprint_bexpr = function
   | True  -> "true"
   | False -> "false"
+  | Nondet -> "*"
   | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
   | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
   | CAS (a, b, c, _) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
@@ -69,3 +71,9 @@ let rec unwrap_atomic = function
   | Atomic s :: tl -> (unwrap_atomic s) @ (unwrap_atomic tl)
   | s1       :: tl -> s1 :: (unwrap_atomic tl)
   | []             -> []
+
+(** Build non-deterministic switch between functions. *)
+let rec build_nondet_switch = function
+  | [] -> []
+  | [ (_,ast) ]   -> ast
+  | (_,ast1) :: tl -> [ IfThenElse (Nondet, ast1, build_nondet_switch tl) ]

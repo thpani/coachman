@@ -78,6 +78,7 @@ let from_ast_pexpr = function
 let rec from_ast_bexpr = function
   | Ast.True -> True
   | Ast.False -> False
+  | Ast.Nondet -> raise (Invalid_argument "Nondet should have been rewritten as assume")
   | Ast.Eq (a, b) -> Eq (from_ast_pexpr a, from_ast_pexpr b)
   | Ast.Neg a -> Neg (from_ast_bexpr a)
   | Ast.CAS _ -> raise (Invalid_argument "CAS should have been rewritten as atomic assume/assign")
@@ -189,6 +190,8 @@ let of_ast ast =
                 Atomic [ Assume (Eq(a, Id b)) ; Asgn(a, Id c) ],
                 Scfg.E d,
                 Atomic [ Assume(Neg(Eq(a, Id b))) ]
+            | Nondet ->
+              Assume True, Scfg.effect_ID, Assume True
             | _ -> Assume guard, Scfg.effect_ID, Assume (Neg guard)
           in
           let selse = else_guard :: selse in
