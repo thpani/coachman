@@ -2,6 +2,7 @@ type t = Const of int | Linear of string | Polynomial of (string * int) list | U
 
 
 let pprint = function
+  | Const 0      -> Printf.sprintf "0"
   | Const i      -> Printf.sprintf "O(%d)" i
   | Linear s     -> Printf.sprintf "O(%s)" s
   | Polynomial l -> (match l with [ (id, pow) ] -> Printf.sprintf "O(%s^%d)" id pow | _ -> "???")
@@ -88,7 +89,7 @@ and of_z3_ite e =
   assert (Z3.Arithmetic.is_le comparison) ;
   let comparison_args = Z3.Expr.get_args comparison in
   let comparison_arg1, comparison_arg2 = List.nth comparison_args 0, List.nth comparison_args 1 in
-  let minmax_op = 
+  let minmax_op =
     if Z3.Expr.is_numeral comparison_arg1 && Z3.Expr.is_const comparison_arg2 then
       max
     else if Z3.Expr.is_const comparison_arg1 && Z3.Expr.is_numeral comparison_arg2 then
