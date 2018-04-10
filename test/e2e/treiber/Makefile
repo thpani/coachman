@@ -1,6 +1,6 @@
 .PHONY: all clean emp pop push
 
-BIN = ../../../codscost.native
+BIN = ../../../codscost.native ${ARGS}
 
 all: emp pop push
 
@@ -11,7 +11,10 @@ emp:
 	$(BIN) treiber.tiny treiber.heap ../empty.summaries
 
 pop:
-	$(BIN) treiber_pop.tiny treiber.heap treiber.summaries
+	$(BIN) -f pop treiber.tiny treiber.heap treiber.summaries
 
 push:
-	$(BIN) treiber_push.tiny treiber.heap treiber.summaries
+	$(BIN) -f push treiber.tiny treiber.heap treiber.summaries
+
+mcg:
+	$(BIN) treiber.tiny treiber.heap treiber.summaries

@@ -2,7 +2,7 @@
 
 BIN = ../../../codscost.native ${ARGS}
 
-all: emp emp_nolag deq deq_nolag enq enq_nolag
+all: emp_nolag emp deq_nolag deq enq_tail_nolag enq_tail enq_nolag enq 
 
 clean:
 	rm -f *.dot *.pdf
@@ -14,19 +14,22 @@ emp_nolag:
 	$(BIN) ms.tiny ms_nolag.heap ../empty.summaries
 
 deq:
-	$(BIN) ms.tiny ms.heap ms_deq.summaries
+	$(BIN) -f deq ms.tiny ms.heap ms.summaries
 
 deq_nolag:
-	$(BIN) ms.tiny ms_nolag.heap ms_deq.summaries
+	$(BIN) -f deq ms.tiny ms_nolag.heap ms.summaries
 
 enq_tail:
-	$(BIN) -ai ms_enq.tiny ms.tail.heap ms_enq.summaries
+	$(BIN) -ai -f enq ms.tiny ms.tail.heap ms_enq.summaries
 
 enq_tail_nolag:
-	$(BIN) -ai ms_enq.tiny ms.tail_nolag.heap ms_enq.summaries
+	$(BIN) -ai -f enq ms.tiny ms.tail_nolag.heap ms_enq.summaries
 
 enq:
-	$(BIN) -ai ms_enq.tiny ms.heap ms_enq.summaries
+	$(BIN) -ai -f enq ms.tiny ms.heap ms.summaries
 
 enq_nolag:
-	$(BIN) -ai ms_enq.tiny ms_nolag.heap ms_enq.summaries
+	$(BIN) -ai -f enq ms.tiny ms_nolag.heap ms.summaries
+
+mcg:
+	$(BIN) -ai ms.tiny ms.heap ms.summaries
