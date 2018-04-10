@@ -230,7 +230,7 @@ let of_ast ast =
           G.Imp.add_edge_e g (!last, ([Assume(Neg (from_ast_bexpr guard))], Scfg.effect_ID), loop_exit) ;
           gen_cfg stmts ;
           G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), loop_head) ;
-          last := max_vertex g
+          last := loop_exit
       | Ast.Break ->
           Debugger.debug "cfg" "Breaking to %d\n" !break_target ;
           G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), !break_target) ;
