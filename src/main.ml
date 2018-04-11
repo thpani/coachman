@@ -48,6 +48,7 @@ let main () =
         Debugger.current_level := Debugger.Debug ;
         Debugger.current_components := (String.split_on_char ',' s)
       ), "Enable debugging" ;
+    "-time", Arg.Set Debugger.print_time, "Print elapsed time with all debug messages" ;
     "-ai", Arg.Set Config.use_ai, "Enable SCC pruning using abstract interpretation" ;
     "-no_qflia", Arg.Clear Config.qf_lia, "Disable fixing Z3 to QF_LIA" ;
     "-no_qe", Arg.Clear Config.qe, "Disable quantifier elimination in transition relation computation" ;

@@ -20,11 +20,13 @@ let lvl_of_string = function
 
 let current_level = ref Info
 let current_components : component list ref = ref []
+let print_time = ref false
 
 let logf lvl component =
   if ord lvl >= ord !current_level && (ord lvl >= ord Info || List.mem component !current_components) then
     begin
       printf "[%s] " component ;
+      if !print_time then printf "%.2f " (Sys.time ()) ;
       printf
     end
   else ifprintf stdout
