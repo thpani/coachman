@@ -71,7 +71,7 @@ let main () =
         | fun_name ->
           fun_name, List.assoc fun_name functions
       in
-          Debugger.info "bound" "%s || %s\n" fun_name (pprint_summaries summaries) ;
+          Debugger.info "main" "%s || %s\n" fun_name (pprint_summaries summaries) ;
           Config.dot_basename := fn_prog_basename ;
           let cfg_with_summaries, get_color = sequentialize fun_ast summaries in
           let edge_bound_map = Bound.compute_bounds ~get_edge_color:get_color init_heaps cfg_with_summaries in
@@ -79,6 +79,6 @@ let main () =
           Bound.print_edge_bound_map edge_bound_map ;
           Bound.write_bound_dot edge_bound_map get_color cfg_with_summaries
         ;
-        Debugger.info "time" "Time taken: %.0fs\n" (Sys.time ())
+        Debugger.info "main" "Time taken: %.0fs\n" (Sys.time ())
     end
   | _ -> prerr_endline usage ; exit 1

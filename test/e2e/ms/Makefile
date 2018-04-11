@@ -2,7 +2,7 @@
 
 BIN = ../../../codscost.native ${ARGS}
 
-all: emp_nolag emp deq_nolag deq enq_tail_nolag enq_tail enq_nolag enq 
+all: emp_nolag emp deq_nolag deq enq_tail_nolag enq_tail enq_nolag enq mgc
 
 clean:
 	rm -f *.dot *.pdf
@@ -31,5 +31,5 @@ enq:
 enq_nolag:
 	$(BIN) -ai -f enq ms.tiny ms_nolag.heap ms.summaries
 
-mcg:
+mgc:
 	$(BIN) -ai ms.tiny ms.heap ms.summaries

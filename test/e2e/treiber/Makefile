@@ -2,7 +2,7 @@
 
 BIN = ../../../codscost.native ${ARGS}
 
-all: emp pop push
+all: emp pop push mgc
 
 clean:
 	rm -f *.dot *.pdf
@@ -16,5 +16,5 @@ pop:
 push:
 	$(BIN) -f push treiber.tiny treiber.heap treiber.summaries
 
-mcg:
+mgc:
 	$(BIN) treiber.tiny treiber.heap treiber.summaries
