@@ -63,23 +63,44 @@ let abstract ctx transrel highest_prime var =
     | Solver.UNSATISFIABLE -> NonStrict
     | _ -> DontKnow
 
-(** [abstract_vars ctx transrel highest_prime vars] returns a map from variables [vars] to size-change predicates implied by transition relations [transrel]. [transrel] ranges over vars with highest prime [highest_prime]. *)
-let abstract_vars ctx transrel highest_prime vars =
+module Z3ExprHashtbl = Hashtbl.Make(
+  struct
+    type t = Z3.Expr.expr
+    let equal = Z3.Expr.equal
+    let hash  = Hashtbl.hash
+  end
+  )
+
+(** [abstract_vars ctx transrel highest_prime vars h] returns a map from variables [vars] to size-change predicates implied by transition relations [transrel]. [transrel] ranges over vars with highest prime [highest_prime]. Hashtable [h] is used to cache abstraction results. *)
+let abstract_vars ctx transrel highest_prime vars h =
   let open Util.DS in
   IdentifierSet.fold (fun var map ->
-    IdentifierMap.add var (abstract ctx transrel highest_prime var) map
+      let abs = match Z3ExprHashtbl.find_opt h transrel with
+        | Some op -> op
+        | None ->
+          begin
+            let op = abstract ctx transrel highest_prime var in
+            Z3ExprHashtbl.add h transrel op ; op
+          end
+      in
+    IdentifierMap.add var abs map
   ) vars IdentifierMap.empty
 
 (** [of_concrete ctx vars ca_rel] abstracts a CA with relational edge labels [ca_rel] over variables [vars] into a size-change system. *)
 let of_rel ctx vars ca_rel =
+  let h = Z3ExprHashtbl.create 10 in
   Ca_rel.G.fold_edges_e (fun (from, ((transrel, highest_prime), summary), to_) ca_rel ->
-    let diff_constr = abstract_vars ctx transrel highest_prime vars in
+    let diff_constr = abstract_vars ctx transrel highest_prime vars h in
     G.add_edge_e ca_rel (from, (diff_constr, summary), to_)
   ) ca_rel G.empty
 
 (** [of_seq ctx vars ca_seq] abstracts a CA with statement edge labels [ca_seq] over variables [vars] into a size-change system. *)
 let of_seq ctx vars ca_seq =
+  Debugger.debug "ca_sca" "seq -> rel\n%!" ;
   let ca_rel = Ca_rel.of_seq ctx ca_seq in
-  of_rel ctx vars ca_rel
+  Debugger.debug "ca_sca" "rel -> sca\n%!" ;
+  let ca_sca = of_rel ctx vars ca_rel in
+  Debugger.debug "ca_sca" "done\n%!" ;
+  ca_sca
 
 (* }}} *)
