@@ -119,11 +119,18 @@ let get_ub_invariant_vars ranking_vars scc abs_map =
 let ca_edge_eq (f,(_,k),t) (f',k',t') = k = k' && Ca_vertex.equal f f' && Ca_vertex.equal t t'
 
 let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_map) =
+  Debugger.debug "local_bound" "  Computing SCCs\n%!" ;
   let sccs = Ca_seq.G.sccs ca_seq in
   (* scc_varranked_edges : scc_number -> variable -> ranked edges *)
+  Debugger.debug "local_bound" "  Computing edges ranked by variables\n%!" ;
   let scc_varranked_edges = List.mapi (fun i scc_seq ->
+    Debugger.debug "local_bound" "    SCC %d\n%!" i ;
+    Debugger.debug "local_bound" "      %s\n%!" (Ca_seq.G.pprint_stats scc_seq) ;
+    Debugger.debug "local_bound" "      Propagating equalities\n%!" ;
     let scc_seq = Ca_seq.propagate_equalities scc_seq in (* TODO is this sound? *)
+    Debugger.debug "local_bound" "      Computing SCA of seq CA\n%!" ;
     let scc_sca = Ca_sca.of_seq ctx vars scc_seq in
+    Debugger.debug "local_bound" "      Computing map\n%!" ;
     let var_edge_map = VariableSet.fold (fun var map ->
       let edges_ranked_by_var = Ca_sca.G.fold_edges_e (fun (f,(dc,k),t) edges_ranked_by_var ->
         (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
@@ -138,10 +145,12 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
     ) vars VariableMap.empty in
     i, var_edge_map
   ) sccs in
+  Debugger.debug "local_bound" "    done.\n%!" ;
   let varranked_edges = List.fold_left (fun varranked_edges (_,scc_varranked_edges) ->
     VariableMap.union (fun _ a b -> Some (a @ b)) varranked_edges scc_varranked_edges
   ) VariableMap.empty scc_varranked_edges
   in
+  Debugger.debug "local_bound" "  Computing local bounds\n%!" ;
   Ca_seq.G.fold_edges_e (fun edge map ->
     Debugger.debug "local_bound_edges" "  Edge %s\n%!" (Ca_sca.G.pprint_edge edge) ;
     Debugger.debug "local_bound" "  Edge %s " (Ca_sca.G.pprint_edge edge) ;
@@ -485,6 +494,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* Build CA from CFG *)
   Debugger.debug "bound" "Building counter automaton from CFG...\n%!" ;
   let ca_seq = Ca_seq.of_cfg cfg init_ca_loc in
+  Debugger.debug "bound" "  %s\n%!" (Ca_seq.G.pprint_stats ca_seq) ;
 
   (* Debugger.debug "bound" "Propagating equalities...\n%!" ; *)
   (* let ca_seq = Ca_seq.propagate_equalities ca_seq in *)
@@ -506,6 +516,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* Ca_seqDot.write_dot ca_seq dot_basename "seq" ; *)
   (* Ca_relDot.write_dot ca_rel dot_basename "rel" ; *)
   (* Ca_scaDot.write_dot ca_sca dot_basename "sca" ; *)
+  Debugger.debug "bound" "CA variables: %s\n" (VariableSet.pprint vars) ;
 
   (* Run interval abstract domain on CA and initial state constraints, to prune infeasible edges. *)
   Debugger.debug "bound" "Pruning infeasible edges in CA...\n%!" ;
@@ -516,6 +527,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   let ca_pruned, num_inf = Ai.remove_infeasible man env abs_map ca_seq (Some init_ca_loc) in
   Debugger.debug "bound" "  %d pruned\n%!" num_inf ;
   (* Ai.print_abs_map man env abs_map ca_pruned ; *)
+  Debugger.debug "bound" "  %s\n%!" (Ca_seq.G.pprint_stats ca_pruned) ;
 
   let module Ca_seqDot = Ca_seq.G.Dot (struct
     type edge = Ca_seq.G.E.t
@@ -555,7 +567,6 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* ) (Ca_seq.G.sccs ca_pruned) ; *)
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
-  Debugger.debug "stats" "%s\n%!" (Ca_seq.G.pprint_stats ca_pruned) ;
 
   let cfg_scc_edges = List.concat (Cfg.G.scc_edges cfg) in
 
@@ -564,8 +575,10 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   let result = ref CfgEdgeMap.empty in
   while !iteration > 0 do
     Debugger.info "bound" "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
+    Debugger.info "bound" "    Calling get_localbounds @ %.2f\n%!" (Sys.time ()) ;
 
     let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map (init_ca_loc,init_abs_map) in
+    Debugger.info "bound" "    Returned get_localbounds @ %.2f\n%!" (Sys.time ()) ;
     let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
       if f'=f && t'=t && ek' = ek then lb :: l else l
     ) [] ca_local_bound_map in
