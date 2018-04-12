@@ -3,6 +3,7 @@ def enq begin
   while true do
     tail := Tail;
     next := tail.next;
+    if !(tail = Tail) then continue; fi
     if next = null then
       if CAS(tail.next, next, node, enq) then
         CAS(Tail, tail, node, enq_swing);
