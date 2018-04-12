@@ -28,7 +28,7 @@ let logf lvl component =
       let longest_component = 
         let component_lengths = List.map String.length !current_components in
         let list_max = function [] -> 0 | x::xs -> List.fold_left max x xs in
-        max 1 (list_max component_lengths)
+        max 5 (list_max component_lengths)
       in
       let padding = max 0 (longest_component - (String.length component)) in
       printf "[%s] %s" component (String.make padding ' ');
