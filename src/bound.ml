@@ -119,94 +119,122 @@ let get_ub_invariant_vars ranking_vars scc abs_map =
 let ca_edge_eq (f,(_,k),t) (f',k',t') = k = k' && Ca_vertex.equal f f' && Ca_vertex.equal t t'
 
 let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_map) =
-  Debugger.debug "local_bound" "  Computing SCCs\n%!" ;
-  let sccs = Ca_seq.G.sccs ca_seq in
-  (* scc_varranked_edges : scc_number -> variable -> ranked edges *)
   Debugger.debug "local_bound" "  Computing edges ranked by variables\n%!" ;
-  let scc_varranked_edges = List.mapi (fun i scc_seq ->
-    Debugger.debug "local_bound" "    SCC %d\n%!" i ;
-    Debugger.debug "local_bound" "      %s\n%!" (Ca_seq.G.pprint_stats scc_seq) ;
-    Debugger.debug "local_bound" "      Propagating equalities\n%!" ;
+  let map_var_ranked_edges = Hashtbl.create (VariableSet.cardinal vars) in
+  let map_edge_ranking_vars = Ca_sca.G.EdgeHashtbl.create (Ca_seq.G.nb_edges ca_seq) in
+  List.iteri (fun i scc_seq ->
+    Debugger.debug "local_bound_ranked" "    SCC %d\n%!" i ;
+    Debugger.debug "local_bound_ranked" "      %s\n%!" (Ca_seq.G.pprint_stats scc_seq) ;
+    Debugger.debug "local_bound_ranked" "      Propagating equalities\n%!" ;
     let scc_seq = Ca_seq.propagate_equalities scc_seq in (* TODO is this sound? *)
-    Debugger.debug "local_bound" "      Computing SCA of seq CA\n%!" ;
+    Debugger.debug "local_bound_ranked" "      Computing SCA of seq CA\n%!" ;
     let scc_sca = Ca_sca.of_seq ctx vars scc_seq in
-    Debugger.debug "local_bound" "      Computing map\n%!" ;
-    let var_edge_map = VariableSet.fold (fun var map ->
-      let edges_ranked_by_var = Ca_sca.G.fold_edges_e (fun (f,(dc,k),t) edges_ranked_by_var ->
+    Debugger.debug "local_bound_ranked" "      Computing map edge -> ranking vars\n%!" ;
+    VariableSet.iter (fun var ->
+      Ca_sca.G.iter_edges_e (fun (f,(dc,k),t) ->
         (* edges on which variable `var' decreases without increasing anywhere in the SCC *)
         let decreases_on_edge = (VariableMap.find var dc) = Ca_sca.Strict in
         let increases_in_scc = Ca_sca.G.fold_edges_e (fun (_,(dc,_),_) b -> b || ((VariableMap.find var dc) = Ca_sca.DontKnow)) scc_sca false in
-        if decreases_on_edge && (not increases_in_scc) then
-          (f,k,t) :: edges_ranked_by_var
-        else
-          edges_ranked_by_var
-      ) scc_sca [] in
-      VariableMap.add var edges_ranked_by_var map
-    ) vars VariableMap.empty in
-    i, var_edge_map
-  ) sccs in
-  Debugger.debug "local_bound" "    done.\n%!" ;
-  let varranked_edges = List.fold_left (fun varranked_edges (_,scc_varranked_edges) ->
-    VariableMap.union (fun _ a b -> Some (a @ b)) varranked_edges scc_varranked_edges
-  ) VariableMap.empty scc_varranked_edges
-  in
+        if decreases_on_edge && (not increases_in_scc) then begin
+          Hashtbl.add map_var_ranked_edges var (f,k,t) ;
+          (* TODO Assumption: v -ek-> v' is unique *)
+          Ca_sca.G.EdgeHashtbl.add map_edge_ranking_vars (f,k,t) var
+        end
+      ) scc_sca
+    ) vars
+  ) (Ca_seq.G.sccs ca_seq) ;
+
+  Debugger.debug "local_bound" "  Computing map edge -> in SCC?\n%!" ;
+  let map_edge_in_scc = Ca_seq.G.EdgeHashtbl.create (Ca_seq.G.nb_edges ca_seq) in
+  List.iter (fun (f,(_,k),t) -> Ca_seq.G.EdgeHashtbl.add map_edge_in_scc (f,k,t) true) (List.concat (Ca_seq.G.scc_edges ca_seq)) ;
+
+  Debugger.debug "local_bound" "  Computing map var -> SCC w/o var-ranked edges\n%!" ;
+  let scc_wo_varranked_edges = Hashtbl.create (VariableSet.cardinal vars) in
+  VariableSet.iter (fun var -> 
+    let varranked_edges = Hashtbl.find_all map_var_ranked_edges var in
+    let ca_seq_wo_varranked_edges = Ca_seq.G.filter_edge_e (fun edge ->
+        not (List.exists (ca_edge_eq edge) varranked_edges)
+      ) ca_seq
+    in
+    Hashtbl.add scc_wo_varranked_edges var ca_seq_wo_varranked_edges
+  ) vars ;
+
+  Debugger.debug "local_bound" "  Computing map edge -> in SCC after removing var-ranked edges?\n%!" ;
+  let map_edge_var_in_scc_w_varranked_removed = Ca_seq.G.EdgeHashtbl.create (Ca_seq.G.nb_edges ca_seq) in
+  VariableSet.iter (fun var -> 
+    let ca_seq_wo_varranked_edges = Hashtbl.find scc_wo_varranked_edges var in
+    List.iter (fun scc ->
+        List.iter (fun (f,(_,k),t) -> (* an edge of an scc after removing var-ranked edges *)
+            Ca_seq.G.EdgeHashtbl.add map_edge_var_in_scc_w_varranked_removed (f,k,t) var
+          ) scc
+      ) (Ca_seq.G.scc_edges ca_seq_wo_varranked_edges)
+  ) vars ;
+
+  Debugger.debug "local_bound" "  Computing map edge -> SCC\n%!" ;
+  let map_edge_scc = Ca_seq.G.EdgeHashtbl.create (Ca_seq.G.nb_edges ca_seq) in
+  List.iter (fun scc_edges ->
+      let scc = List.fold_left (fun g edge -> Ca_seq.G.add_edge_e g edge) Ca_seq.G.empty scc_edges in
+      List.iter (fun (f,(_,k),t) ->
+          Ca_seq.G.EdgeHashtbl.add map_edge_scc (f,k,t) scc
+        ) scc_edges
+    ) (Ca_seq.G.scc_edges ca_seq) ;
+
+(*   Debugger.debug "local_bound" "  Computing map var -> ub_invariant\n%!" ; *)
+(*   let map_var_ub_invariant = Hashtbl.create (VariableSet.cardinal vars) in *)
+(*   VariableSet.iter (fun var -> *)
+(*       get_ub_invariant var scc abs_map *)
+(*     ) vars ; *)
+
   Debugger.debug "local_bound" "  Computing local bounds\n%!" ;
   Ca_seq.G.fold_edges_e (fun edge map ->
-    Debugger.debug "local_bound_edges" "  Edge %s\n%!" (Ca_sca.G.pprint_edge edge) ;
-    Debugger.debug "local_bound" "  Edge %s " (Ca_sca.G.pprint_edge edge) ;
+    Debugger.debug "local_bound_edge" "  Edge %s %!" (Ca_seq.G.pprint_edge edge) ;
     let local_bound =
       (* (1) We set ζ(τ) = 1 for all transitions τ that do not belong to an SCC. *)
-      if not (Ca_seq.G.edge_in_scc edge ca_seq) then
+      let edge_wo_label = let f,(_,k),t = edge in f,k,t in
+      if not (Ca_seq.G.EdgeHashtbl.mem map_edge_in_scc edge_wo_label) then
         begin
-          Debugger.debug "local_bound" "outside SCC. Const.\n" ;
+          Debugger.debug "local_bound_edge" "outside SCC. Const.\n" ;
           Rank.Const 1
         end
       else
-        let ranking_vars = VariableSet.filter (fun var ->
-          let varranked_edges = VariableMap.find var varranked_edges in
-          List.exists (ca_edge_eq edge) varranked_edges
-        ) vars
-        in
+        let f,(_,ek),t = edge in
+        let ranking_vars = Ca_sca.G.EdgeHashtbl.find_all map_edge_ranking_vars (f,ek,t) in
+        let ranking_vars = List.fold_right VariableSet.add ranking_vars VariableSet.empty in
         if not (VariableSet.is_empty ranking_vars) then
           (* (2) Let v ∈ V. We define ξ(v) ⊆ E to be the set of all transitions τ = l1 → l2 ∈ E such that v' ≤ v + c ∈ u for some c < 0. For all τ ∈ ξ(v) we set ζ(τ) = v. *)
           begin
             let f,(_,k),t = edge in
-            let scc_seq = Ca_seq.G.scc_of_edge ca_seq f t k in
+            let scc_seq = Ca_seq.G.EdgeHashtbl.find map_edge_scc (f,k,t) in
             let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map_ca in
-            Debugger.debug "local_bound" "ranked by %s.\n" (VariableSet.pprint ranking_vars) ;
+            Debugger.debug "local_bound_edge" "ranked by %s.\n" (VariableSet.pprint ranking_vars) ;
             Rank.Var (ranking_vars, inv_ranking_vars)
           end
         else
           begin
-            Debugger.debug "local_bound" "ranked by none. " ;
+            Debugger.debug "local_bound_edge" "ranked by none. " ;
             if not !Config.use_ai then
               (* (3) Let v ∈ V and τ ∈ E. Assume τ was not yet assigned a local bound by (1) or (2). We set ζ(τ) = v, if τ does not belong to a strongly connected component (SCC) of the directed graph (L, E′) where E′ = E \ {ξ(v)} (the control flow graph of ∆P without the transitions in ξ(v)). *)
-              let ranking_vars = VariableSet.filter (fun var ->
-                let varranked_edges = VariableMap.find var varranked_edges in
-                let ca_seq_wo_varranked_edges = Ca_seq.G.filter_edge_e (fun edge ->
-                  not (List.exists (ca_edge_eq edge) varranked_edges)
-                ) ca_seq in
-                not (Ca_seq.G.edge_in_scc edge ca_seq_wo_varranked_edges)
-              ) vars in
+              let ranking_vars = 
+                let non_ranking_vars = Ca_seq.G.EdgeHashtbl.find_all map_edge_var_in_scc_w_varranked_removed edge_wo_label in
+                let non_ranking_vars_set = List.fold_right VariableSet.add non_ranking_vars VariableSet.empty in
+                VariableSet.diff vars non_ranking_vars_set
+              in
               if not (VariableSet.is_empty ranking_vars) then
                 begin
                   let f,(_,k),t = edge in
-                  let scc_seq = Ca_seq.G.scc_of_edge ca_seq f t k in
+                  let scc_seq = Ca_seq.G.EdgeHashtbl.find map_edge_scc (f,k,t) in
                   let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map_ca in
-                  Debugger.debug "local_bound" "Vars breaking SCC: %s\n" (VariableSet.pprint ranking_vars) ;
+                  Debugger.debug "local_bound_edge" "Vars breaking SCC: %s\n" (VariableSet.pprint ranking_vars) ;
                   Rank.Var (ranking_vars, inv_ranking_vars)
                 end
               else
                 begin
-                  Debugger.debug "local_bound" "Unbounded.\n" ;
+                  Debugger.debug "local_bound_edge" "Unbounded.\n" ;
                   Rank.Unbounded
                 end
             else (* use AI *)
               let ranking_vars = VariableSet.filter (fun var ->
-                let varranked_edges = VariableMap.find var varranked_edges in
-                let ca_seq_wo_varranked_edges = Ca_seq.G.filter_edge_e (fun edge ->
-                  not (List.exists (ca_edge_eq edge) varranked_edges)
-                ) ca_seq in
+                let ca_seq_wo_varranked_edges = Hashtbl.find scc_wo_varranked_edges var in
                 let abs_map = Ai.do_abstract_computation man env (Some init_abs_map) ca_seq_wo_varranked_edges in
                 let ca_seq_wo_varranked_edges_pruned, inf = Ai.remove_infeasible man env abs_map ca_seq_wo_varranked_edges (Some init_ca_loc) in
                 (* let module Ca_seqDot = Ca_seq.G.Dot (struct *)
@@ -222,14 +250,14 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
               if not (VariableSet.is_empty ranking_vars) then
                 begin
                   let f,(_,k),t = edge in
-                  let scc_seq = Ca_seq.G.scc_of_edge ca_seq f t k in
+                  let scc_seq = Ca_seq.G.EdgeHashtbl.find map_edge_scc (f,k,t) in
                   let inv_ranking_vars = get_ub_invariant_vars ranking_vars scc_seq abs_map_ca in
-                  Debugger.debug "local_bound" "Vars breaking SCC with AI pruning: %s\n" (VariableSet.pprint ranking_vars) ;
+                  Debugger.debug "local_bound_edge" "Vars breaking SCC with AI pruning: %s\n" (VariableSet.pprint ranking_vars) ;
                   Rank.Var (ranking_vars, inv_ranking_vars)
                 end
               else
                 begin
-                  Debugger.debug "local_bound" "Unbounded.\n" ;
+                  Debugger.debug "local_bound_edge" "Unbounded.\n" ;
                   Rank.Unbounded
                 end
           end
@@ -575,10 +603,10 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   let result = ref CfgEdgeMap.empty in
   while !iteration > 0 do
     Debugger.info "bound" "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
-    Debugger.info "bound" "    Calling get_localbounds @ %.2f\n%!" (Sys.time ()) ;
+    Debugger.debug "bound" "    Calling get_localbounds\n%!" ;
 
     let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map (init_ca_loc,init_abs_map) in
-    Debugger.info "bound" "    Returned get_localbounds @ %.2f\n%!" (Sys.time ()) ;
+    Debugger.debug "bound" "    Returned get_localbounds\n%!" ;
     let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
       if f'=f && t'=t && ek' = ek then lb :: l else l
     ) [] ca_local_bound_map in

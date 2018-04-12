@@ -137,15 +137,6 @@ module G (C:GConfig) = struct
     let scc_edges = List.concat (scc_edges g) in
     List.exists (equal_edge edge) scc_edges
 
-  let scc_of_edge g f t et =
-    let scc = List.filter (fun scc_edges ->
-      List.exists (fun (v,(_,e),v') -> C.equal_vertex v f && C.equal_vertex v' t && e = et) scc_edges
-    ) (scc_edges g) in
-    match scc with
-    | [] -> empty
-    | [ edges ] -> List.fold_left (fun g edge -> add_edge_e g edge) empty edges
-    | _ -> assert false
-
   let all_paths g vfrom vto =
     let rec loop g vfrom prefix =
       if List.exists (C.equal_vertex vfrom) vto then
@@ -159,4 +150,17 @@ module G (C:GConfig) = struct
         )
     in
     loop g vfrom []
+
+  (* https://stackoverflow.com/a/27952689/1161037 *)
+  let combine_hash a b = (a lsl 1) + a + b
+  module EdgeHashtbl = Hashtbl.Make(struct
+    type t = C.vertex * edge_kind * C.vertex
+    let equal = equal_edge_ignore_labels
+    let hash (v,ek,v') =
+      let hash_v = C.hash_vertex v in
+      let hash_v' = C.hash_vertex v' in
+      let hash_ek = Hashtbl.hash ek in
+      List.fold_left (fun hash part_hash -> combine_hash hash part_hash) 0 [
+        hash_v ; hash_ek ; hash_v' ]
+  end)
 end
