@@ -119,7 +119,7 @@ let get_ub_invariant_vars ranking_vars scc abs_map =
 let ca_edge_eq (f,(_,k),t) (f',k',t') = k = k' && Ca_vertex.equal f f' && Ca_vertex.equal t t'
 
 let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_map) =
-  Debugger.debug "local_bound" "  Computing edges ranked by variables\n%!" ;
+  Debugger.debug "local_bound" "  Computing size-change abstraction and edges ranked by variables\n%!" ;
   let map_var_ranked_edges = Hashtbl.create (VariableSet.cardinal vars) in
   let map_edge_ranking_vars = Ca_sca.G.EdgeHashtbl.create (Ca_seq.G.nb_edges ca_seq) in
   List.iteri (fun i scc_seq ->
@@ -533,6 +533,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
     let summary_vars = VariableSet.map summary_ctr summaries in
     VariableSet.union ca_vars summary_vars
   in
+  Debugger.debug "bound" "  counter variables: %s\n" (VariableSet.pprint vars) ;
 
   (* For bounded CA summary edges, add decrement statement of the summary_counter *)
   let ca_seq = refine_ca_with_env_bounds ca_seq !env_bound_map in
@@ -544,7 +545,6 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* Ca_seqDot.write_dot ca_seq dot_basename "seq" ; *)
   (* Ca_relDot.write_dot ca_rel dot_basename "rel" ; *)
   (* Ca_scaDot.write_dot ca_sca dot_basename "sca" ; *)
-  Debugger.debug "bound" "CA variables: %s\n" (VariableSet.pprint vars) ;
 
   (* Run interval abstract domain on CA and initial state constraints, to prune infeasible edges. *)
   Debugger.debug "bound" "Pruning infeasible edges in CA...\n%!" ;
@@ -553,7 +553,6 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* print_absv man env init_ca_loc (VertexMap.find init_ca_loc abs_map) ; *)
   (* print_abs_map man env abs_map cfg ; *)
   let ca_pruned, num_inf = Ai.remove_infeasible man env abs_map ca_seq (Some init_ca_loc) in
-  Debugger.debug "bound" "  %d pruned\n%!" num_inf ;
   (* Ai.print_abs_map man env abs_map ca_pruned ; *)
   Debugger.debug "bound" "  %s\n%!" (Ca_seq.G.pprint_stats ca_pruned) ;
 
@@ -603,10 +602,9 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   let result = ref CfgEdgeMap.empty in
   while !iteration > 0 do
     Debugger.info "bound" "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
-    Debugger.debug "bound" "    Calling get_localbounds\n%!" ;
 
     let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map (init_ca_loc,init_abs_map) in
-    Debugger.debug "bound" "    Returned get_localbounds\n%!" ;
+    Debugger.debug "bound" "  Accumulating local bounds\n%!" ;
     let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
       if f'=f && t'=t && ek' = ek then lb :: l else l
     ) [] ca_local_bound_map in
