@@ -599,7 +599,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
                * than testing on the CA; edges may be doubled there because of the
                * refined control structure. *)
               let edge_belongs_to_cfg_scc =
-                List.exists (Cfg.G.equal_edge_ignore_labels (f,edge_type,t)) cfg_scc_edges in
+                List.exists (fun (f',(_,edge_type'),t') -> Cfg.G.equal_edge_ignore_labels (f,edge_type,t) (f',edge_type',t')) cfg_scc_edges in
               if edge_belongs_to_cfg_scc then
                 fold_bounds ctx !env_bound_map ca_edge_local_bounds (f=t)
               else

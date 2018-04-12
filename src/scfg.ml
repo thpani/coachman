@@ -88,7 +88,7 @@ module G (C:GConfig) = struct
 
   let pprint_stats g = Printf.sprintf "|V| = %d, |E| = %d" (nb_vertex g) (nb_edges g)
 
-  let equal_edge_ignore_labels (c1,et1,c1') (c2,(_,et2),c2') =
+  let equal_edge_ignore_labels (c1,et1,c1') (c2,et2,c2') =
     C.equal_vertex c1 c2 && C.equal_vertex c1' c2' && et1 = et2
 
   let equal_edge (c1,(l1,et1),c1') (c2,(l2,et2),c2') =
