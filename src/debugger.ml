@@ -25,8 +25,8 @@ let print_time = ref false
 let logf lvl component =
   if ord lvl >= ord !current_level && (ord lvl >= ord Info || List.mem component !current_components) then
     begin
-      printf "[%s] " component ;
-      if !print_time then printf "%.2f " (Sys.time ()) ;
+      printf "%-7s " ("[" ^ component ^ "]") ;
+      if !print_time then printf "%5.1f " (Sys.time ()) ;
       printf
     end
   else ifprintf stdout
