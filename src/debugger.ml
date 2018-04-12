@@ -25,7 +25,13 @@ let print_time = ref false
 let logf lvl component =
   if ord lvl >= ord !current_level && (ord lvl >= ord Info || List.mem component !current_components) then
     begin
-      printf "%-7s " ("[" ^ component ^ "]") ;
+      let longest_component = 
+        let component_lengths = List.map String.length !current_components in
+        let list_max = function [] -> 0 | x::xs -> List.fold_left max x xs in
+        max 1 (list_max component_lengths)
+      in
+      let padding = max 0 (longest_component - (String.length component)) in
+      printf "[%s] %s" component (String.make padding ' ');
       if !print_time then printf "%5.1f " (Sys.time ()) ;
       printf
     end
