@@ -27,6 +27,14 @@ end
 module Z3 = struct
   include Z3
 
+  module Z3ExprHashtbl = Hashtbl.Make(struct
+      type t = Z3.Expr.expr
+      let equal = Z3.Expr.equal
+      let hash  = Hashtbl.hash
+    end)
+
+  let hash_table = Z3ExprHashtbl.create 100
+
   let int_sort = Arithmetic.Integer.mk_sort
 
   (** [mk_numeral ctx n] makes a numeral of value [n]. *)
@@ -43,10 +51,18 @@ module Z3 = struct
   (** [check ctx f] checks [f] for validity. *)
   let check_valid ctx f =
     let sat_problem = Boolean.mk_not ctx f in
-    let qf_lia = Config.get_qf_lia () in
-    let s = Solver.mk_solver ctx qf_lia in
-    Solver.add s [ sat_problem ] ;
-    (Solver.check s []) = Solver.UNSATISFIABLE
+    let result =
+      match Z3ExprHashtbl.find_opt hash_table sat_problem with
+      | Some result -> result
+      | None ->
+        let qf_lia = Config.get_qf_lia () in
+        let s = Solver.mk_solver ctx qf_lia in
+        Solver.add s [ sat_problem ] ;
+        let result = Solver.check s [] in
+        Z3ExprHashtbl.add hash_table sat_problem result ;
+        result
+    in
+    result = Solver.UNSATISFIABLE
 end
 
 (** Map integers to a set of colors. *)
