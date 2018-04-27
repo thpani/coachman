@@ -1,15 +1,17 @@
-# update opam & install ocamlfind (in opam)
 FROM ocaml/opam
+
+# update opam
 RUN cd opam-repository && git pull
 RUN opam update
-RUN opam install ocamlfind
 
-# update apt + install binutils for gprof
-RUN sudo apt-get update && sudo apt-get install -y binutils
+# update apt
+RUN sudo apt-get update
 
 # install codscost
-WORKDIR /home/opam
 ARG CACHEBUST=1
-RUN opam pin add -n codscost https://github.com/thpani/codscost.git
+RUN git clone https://github.com/thpani/codscost.git
+RUN opam pin add -n codscost codscost
 RUN opam depext codscost
 RUN opam install codscost
+ENV LD_LIBRARY_PATH /home/opam/.opam/4.05.0/lib/z3:$LD_LIBRARY_PATH
+WORKDIR /home/opam/codscost
