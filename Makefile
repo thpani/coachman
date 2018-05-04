@@ -38,6 +38,7 @@ install: native
 test: $(TREIBER) $(MS)
 
 testclean:
+	rm -f *.dot *.pdf
 	$(MAKE) -C test/e2e/treiber clean
 	$(MAKE) -C test/e2e/ms clean
 
