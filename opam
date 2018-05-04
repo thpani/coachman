@@ -3,8 +3,12 @@ name: "coachman"
 version: "~unknown"
 maintainer: "Thomas Pani <thomas.pani@gmail.com>"
 authors: "Thomas Pani <thomas.pani@gmail.com>"
+homepage: "https://github.com/thpani/coachman"
+bug-reports: "https://github.com/thpani/coachman/issues"
+dev-repo: "https://github.com/thpani/coachman"
 build: make
 install: [make "prefix=%{prefix}%" "install"]
+remove: ["ocamlfind" "remove" "coachman"]
 depends: [
-  "ocamlfind" {build} "apron" "ocamlgraph" "z3"
+  "ocamlfind" {build} "ounit" {test} "apron" "ocamlgraph" "z3"
 ]
