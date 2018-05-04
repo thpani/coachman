@@ -1,5 +1,5 @@
 opam-version: "1.2"
-name: "l2ca"
+name: "coachman"
 version: "~unknown"
 maintainer: "Thomas Pani <thomas.pani@gmail.com>"
 authors: "Thomas Pani <thomas.pani@gmail.com>"

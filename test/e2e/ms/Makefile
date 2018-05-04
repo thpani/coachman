@@ -1,6 +1,6 @@
 .PHONY: all clean emp emp_nolag deq deq_nolag enq enq_nolag
 
-BIN = ../../../codscost.native ${ARGS}
+BIN = ../../../coachman.native ${ARGS}
 
 all: emp_nolag emp deq_nolag deq enq_tail_nolag enq_tail enq_nolag enq mgc
 

@@ -1,6 +1,6 @@
 .PHONY: all clean emp pop push
 
-BIN = ../../../codscost.native ${ARGS}
+BIN = ../../../coachman.native ${ARGS}
 
 all: emp pop push mgc
 

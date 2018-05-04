@@ -42,7 +42,7 @@ let sequentialize ast summaries =
 let main () =
   let args = ref [] in
   let func = ref "" in
-  let usage = "Usage: codscost [args] <prog> <heap> <summaries>" in
+  let usage = "Usage: coachman [args] <prog> <heap> <summaries>" in
   Arg.parse [
     "-debug", Arg.String (fun s ->
         Debugger.current_level := Debugger.Debug ;

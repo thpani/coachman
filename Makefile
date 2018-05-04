@@ -15,10 +15,10 @@ clean:
 	$(OCB) -clean
 
 native:
-	$(OCB) codscost.native
+	$(OCB) coachman.native
 
 profile:
-	$(OCB) -tag profile codscost.native
+	$(OCB) -tag profile coachman.native
 
 unit:
 	$(OCB) unit.native
@@ -33,7 +33,7 @@ doc:
 	$(OCB) doc/api.docdir/api.dot
 
 install: native
-	install -m 0755 codscost.native $(prefix)/bin/codscost
+	install -m 0755 coachman.native $(prefix)/bin/coachman
 
 test: $(TREIBER) $(MS)
 
