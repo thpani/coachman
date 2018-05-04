@@ -436,13 +436,13 @@ type cfg_edge_map = t CfgEdgeMap.t
 let print_edge_bound_map map =
   CfgEdgeMap.iter (fun (f,et,t) local_bounds ->
       match et with
-      | E _ ->
+      | Scfg.E _ ->
         Debugger.info "bound" "  %s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint local_bounds)
       | _ -> ()
     ) map ;
    CfgEdgeMap.iter (fun (f,et,t) local_bounds ->
       match et with
-      | S _ ->
+      | Scfg.S _ ->
         Debugger.info "bound" "  %s: %s %s\n" (Cfg.G.pprint_cfg_edge (f,et,t)) (pprint_bound_asymp local_bounds) (pprint local_bounds)
       | _ -> ()
   ) map
