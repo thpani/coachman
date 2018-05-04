@@ -1,5 +1,6 @@
 # COACHMAN
 
+<img align="right" width="150" src="https://user-images.githubusercontent.com/82047/39621966-d8711dec-4f90-11e8-9792-7c31968157c6.jpg">
 COACHMAN is a COmplexity Analyzer for Concurrent Heap-MANipulating programs.
 
 It implements
