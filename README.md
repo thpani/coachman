@@ -2,6 +2,12 @@
 
 COACHMAN is a COmplexity Analyzer for Concurrent Heap-MANipulating programs.
 
+It implements
+
+* translation from heap-manipulating programs to integer programs from [[1]](#references) (slightly extended for atomic transitions)
+* rely-guarantee bound analysis from [[2]](#references)
+* sequential bound analysis based on [[3]](#references)
+
 ## Run
 
 The easiest way to get `coachman` running is in a Docker container – other build options are [listed below](#build).
@@ -40,3 +46,9 @@ $ opam pin add -n coachman coachman
 $ opam depext -i coachman
 $ export LD_LIBRARY_PATH="$(ocamlfind printconf destdir)/z3:${LD_LIBRARY_PATH}"
 ```
+
+# References
+
+[1] A. Bouajjani, M. Bozga, P. Habermehl, R. Iosif, P. Moro, and T. Vojnar, “Programs with lists are counter automata,” Formal Methods in System Design, vol. 38, no. 2, pp. 158–192, 2011.  
+[2] T. Pani, G. Weissenbacher, F. Zuleger, “Rely-Guarantee Reasoning for Automated Complexity Analysis of Non-Blocking Algorithms,” Note: under submission.  
+[3] M. Sinn, F. Zuleger, and H. Veith, “Complexity and resource bound analysis of imperative programs using difference constraints,” J. Autom. Reasoning, vol. 59, no. 1, pp. 3–45, 2017.
