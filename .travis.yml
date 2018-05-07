@@ -9,4 +9,4 @@ before_install:
 - docker pull thpani/coachman
 
 script:
-- docker run thpani/coachman make e2e
+- docker run thpani/coachman make test_all
