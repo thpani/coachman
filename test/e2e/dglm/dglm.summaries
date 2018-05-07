@@ -1,0 +1,21 @@
+def deq begin
+  assume(!(Head.next = null));
+  Head := Head.next;
+end
+
+def deq_swing begin
+  assume(!(Tail.next = null));
+  Tail := Tail.next;
+end
+
+def enq begin
+  assume(Tail.next = null);
+  __node := new;
+  Tail.next := __node;
+  __node := null;
+end
+
+def enq_swing begin
+  assume(!(Tail.next = null));
+  Tail := Tail.next;
+end
