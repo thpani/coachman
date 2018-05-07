@@ -1,13 +1,7 @@
-OCB_FLAGS = -use-ocamlfind -I src -I src/programs -I src/heaps -I test/e2e -I test/unit
+OCB_FLAGS = -use-ocamlfind -I src -I src/programs -I src/heaps -I test -I test/e2e -I test/unit
 OCB = ocamlbuild $(OCB_FLAGS)
 
-TREIBER_FUNCS := emp pop push mgc
-TREIBER := testt $(foreach func,$(TREIBER_FUNCS),testt_$(func))
-MS_FUNCS := emp deq enq enq_tail mgc
-MS_FUNCS_PREFIXED := $(foreach func,$(MS_FUNCS),testms_$(func))
-MS := testms $(MS_FUNCS_PREFIXED) $(foreach func,$(MS_FUNCS_PREFIXED),$(func)_nolag)
-
-.PHONY: all clean native unit doc install test testclean $(TREIBER) $(MS)
+.PHONY: all clean native unit test_unit e2e test_e2e testall test_all doc install testclean $(TREIBER) $(MS)
 
 all: native
 
@@ -17,16 +11,23 @@ clean:
 native:
 	$(OCB) coachman.native
 
-profile:
-	$(OCB) -tag profile coachman.native
-
 unit:
-	$(OCB) unit.native
-	./unit.native
+	$(OCB) unit_all.native
 
-e2e:
-	$(OCB) e2e.native
-	./e2e.native
+test_unit: unit
+	./unit_all.native
+
+e2e: 
+	$(OCB) e2e_all.native
+
+test_e2e: e2e
+	./e2e_all.native
+
+testall:
+	$(OCB) test_all.native
+
+test_all: testall
+	./test_all.native
 
 doc:
 	$(OCB) doc/api.docdir/index.html
@@ -34,16 +35,3 @@ doc:
 
 install: native
 	install -m 0755 coachman.native $(prefix)/bin/coachman
-
-test: $(TREIBER) $(MS)
-
-testclean:
-	rm -f *.dot *.pdf
-	$(MAKE) -C test/e2e/treiber clean
-	$(MAKE) -C test/e2e/ms clean
-
-$(TREIBER): native
-	@$(MAKE) -C test/e2e/treiber $(patsubst _%,%,$(patsubst testt%,%,$@))
-
-$(MS): native
-	@$(MAKE) -C test/e2e/ms $(patsubst _%,%,$(patsubst testms%,%,$@))

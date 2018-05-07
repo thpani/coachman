@@ -1,6 +1,6 @@
-.PHONY: all clean emp pop push
-
 BIN = ../../../coachman.native ${ARGS}
+
+.PHONY: all clean emp pop push mgc
 
 all: emp pop push mgc
 
