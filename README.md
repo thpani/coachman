@@ -14,6 +14,7 @@ It implements
 The easiest way to get `coachman` running is in a Docker container – other build options are [listed below](#build).
 
 ```bash
+$ docker pull thpani/coachman
 $ docker run -it thpani/coachman
 ```
 
