@@ -20,8 +20,6 @@ type stmt =
   | Alloc of pexpr
   | Asgn of pexpr * pexpr
 
-type seq = stmt list
-
 type ploc = Scfg.ploc
 
 (* }}} *)
@@ -53,7 +51,7 @@ and pprint_seq ?(sep=";\n") stmts =
 
 module G = Scfg.G(struct
   type vertex = ploc
-  type edge_label = seq
+  type edge_label = stmt list
 
   let compare_vertex = Pervasives.compare
   let hash_vertex    = Hashtbl.hash

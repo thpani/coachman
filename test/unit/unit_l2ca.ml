@@ -12,42 +12,42 @@ let nodes_12 = NodeSet.add 2 nodes_1
 let nodes_13 = NodeSet.add 3 nodes_1
 let nodes_123 = NodeSet.add 3 nodes_12
 let nodes_1234 = NodeSet.add 4 nodes_123
-let succ_empty = SuccMap.empty
-let succ_1_0 = SuccMap.add 1 0 succ_empty
-let succ_1_1 = SuccMap.add 1 1 succ_empty
-let succ_1_2 = SuccMap.add 1 2 succ_empty
-let succ_1_2_0 = SuccMap.add 2 0 succ_1_2
-let succ_1_2_2 = SuccMap.add 2 2 succ_1_2
-let succ_1_3 = SuccMap.add 1 3 succ_empty
-let succ_12_0 = SuccMap.add 2 0 succ_1_0
-let succ_12_2 = SuccMap.add 2 2 succ_1_2
-let succ_123_2 = SuccMap.add 3 2 succ_12_2
-let succ_13_2 = SuccMap.add 3 2 succ_1_2
-let succ_13_2_0 = SuccMap.add 2 0 succ_13_2
-let succ_134_2 = SuccMap.add 4 2 succ_13_2
-let succ_134_2_0 = SuccMap.add 4 2 succ_13_2_0
-let succ_2_0 = SuccMap.add 2 0 succ_empty
-let succ_2_1 = SuccMap.add 2 1 succ_empty
-let succ_2_2 = SuccMap.add 2 2 succ_empty
-let succ_23_0 = SuccMap.add 3 0 (SuccMap.add 2 0 succ_empty)
-let succ_23_2 = SuccMap.add 3 2 (SuccMap.add 2 2 succ_empty)
-let succ_3_2_0 = SuccMap.add 3 2 (SuccMap.add 2 0 succ_empty)
-let succ_34_2_0 = SuccMap.add 2 0 (SuccMap.add 3 2 (SuccMap.add 4 2 succ_empty))
-let succ_1_0_23_2 = SuccMap.add 3 2 (SuccMap.add 2 2 succ_1_0)
-let succ_1_0_34_2 = SuccMap.add 3 2 (SuccMap.add 4 2 succ_1_0)
-let succ_1_0_34_2_0 = SuccMap.add 2 0 succ_1_0_34_2
-let succ_13_0 = SuccMap.add 3 0 succ_1_0
-let succ_3_0 = SuccMap.add 3 0 succ_empty
-let var_u_0 = VarMap.add "u" 0 VarMap.empty
-let var_u_1 = VarMap.add "u" 1 VarMap.empty
-let var_u_2 = VarMap.add "u" 2 VarMap.empty
-let var_u_0_w_1 = VarMap.add "w" 1 var_u_0
-let var_uw_1 = VarMap.add "w" 1 var_u_1
-let var_w_1_u_2 = VarMap.add "w" 1 var_u_2
+let succ_empty = NodeMap.empty
+let succ_1_0 = NodeMap.add 1 0 succ_empty
+let succ_1_1 = NodeMap.add 1 1 succ_empty
+let succ_1_2 = NodeMap.add 1 2 succ_empty
+let succ_1_2_0 = NodeMap.add 2 0 succ_1_2
+let succ_1_2_2 = NodeMap.add 2 2 succ_1_2
+let succ_1_3 = NodeMap.add 1 3 succ_empty
+let succ_12_0 = NodeMap.add 2 0 succ_1_0
+let succ_12_2 = NodeMap.add 2 2 succ_1_2
+let succ_123_2 = NodeMap.add 3 2 succ_12_2
+let succ_13_2 = NodeMap.add 3 2 succ_1_2
+let succ_13_2_0 = NodeMap.add 2 0 succ_13_2
+let succ_134_2 = NodeMap.add 4 2 succ_13_2
+let succ_134_2_0 = NodeMap.add 4 2 succ_13_2_0
+let succ_2_0 = NodeMap.add 2 0 succ_empty
+let succ_2_1 = NodeMap.add 2 1 succ_empty
+let succ_2_2 = NodeMap.add 2 2 succ_empty
+let succ_23_0 = NodeMap.add 3 0 (NodeMap.add 2 0 succ_empty)
+let succ_23_2 = NodeMap.add 3 2 (NodeMap.add 2 2 succ_empty)
+let succ_3_2_0 = NodeMap.add 3 2 (NodeMap.add 2 0 succ_empty)
+let succ_34_2_0 = NodeMap.add 2 0 (NodeMap.add 3 2 (NodeMap.add 4 2 succ_empty))
+let succ_1_0_23_2 = NodeMap.add 3 2 (NodeMap.add 2 2 succ_1_0)
+let succ_1_0_34_2 = NodeMap.add 3 2 (NodeMap.add 4 2 succ_1_0)
+let succ_1_0_34_2_0 = NodeMap.add 2 0 succ_1_0_34_2
+let succ_13_0 = NodeMap.add 3 0 succ_1_0
+let succ_3_0 = NodeMap.add 3 0 succ_empty
+let var_u_0 = VariableMap.add "u" 0 VariableMap.empty
+let var_u_1 = VariableMap.add "u" 1 VariableMap.empty
+let var_u_2 = VariableMap.add "u" 2 VariableMap.empty
+let var_u_0_w_1 = VariableMap.add "w" 1 var_u_0
+let var_uw_1 = VariableMap.add "w" 1 var_u_1
+let var_w_1_u_2 = VariableMap.add "w" 1 var_u_2
 
 let h_A1 = { nodes = nodes_empty ; succ = succ_empty ; var = var_u_0 }
-let h_A2 = { nodes = nodes_1 ; succ = succ_empty ; var = VarMap.add "w" 1 var_u_1 }
-let h_A2_res = { nodes = nodes_1 ; succ = succ_empty ; var = VarMap.add "w" 1 var_u_0 }
+let h_A2 = { nodes = nodes_1 ; succ = succ_empty ; var = VariableMap.add "w" 1 var_u_1 }
+let h_A2_res = { nodes = nodes_1 ; succ = succ_empty ; var = VariableMap.add "w" 1 var_u_0 }
 let h_A2'_1 = { nodes = nodes_123 ; succ = succ_13_2_0 ; var = var_u_2 }
 let h_A2'_1_res = { nodes = nodes_123 ; succ = succ_13_2_0 ; var = var_u_0 }
 let h_A2'_2 = { nodes = nodes_12 ; succ = succ_12_2 ; var = var_u_2 }
@@ -58,12 +58,12 @@ let h_A3_1 = { nodes = nodes_1 ; succ = succ_1_0 ; var = var_u_1 }
 let h_A3_1_res = { nodes = nodes_empty ; succ = succ_empty ; var = var_u_0 }
 let h_A3_2 = { nodes = nodes_1 ; succ = succ_1_1 ; var = var_u_1 }
 let h_A3_2_res = { nodes = nodes_empty ; succ = succ_empty ; var = var_u_0 }
-let h_A3' = { nodes = nodes_12 ; succ = succ_1_2_0 ; var = VarMap.add "w" 2 var_u_1 }
-let h_A3'_res = { nodes = nodes_2 ; succ = succ_2_0 ; var = VarMap.add "w" 2 var_u_0 }
+let h_A3' = { nodes = nodes_12 ; succ = succ_1_2_0 ; var = VariableMap.add "w" 2 var_u_1 }
+let h_A3'_res = { nodes = nodes_2 ; succ = succ_2_0 ; var = VariableMap.add "w" 2 var_u_0 }
 let h_A3''_1 = { nodes = nodes_1234 ; succ = succ_134_2_0 ; var = var_u_1 }
 let h_A3''_1_res = { nodes = nodes_234 ; succ = succ_34_2_0 ; var = var_u_0 }
-let h_A3''_2 = { nodes = nodes_123 ; succ = succ_123_2 ; var = VarMap.add "p" 2 var_u_1 }
-let h_A3''_2_res = { nodes = nodes_23 ; succ = succ_23_2 ; var = VarMap.add "p" 2 var_u_0 }
+let h_A3''_2 = { nodes = nodes_123 ; succ = succ_123_2 ; var = VariableMap.add "p" 2 var_u_1 }
+let h_A3''_2_res = { nodes = nodes_23 ; succ = succ_23_2 ; var = VariableMap.add "p" 2 var_u_0 }
 let h_A3''' = { nodes = nodes_123 ; succ = succ_13_2_0 ; var = var_u_1 }
 let h_A3'''_res = { nodes = nodes_3 ; succ = succ_3_0 ; var = var_u_0 }
 let h_A3'''' = { nodes = nodes_12 ; succ = succ_12_2 ; var = var_u_1 }
@@ -77,12 +77,12 @@ let h_A9_1 = { nodes = nodes_1 ; succ = succ_1_0 ; var = var_u_1 }
 let h_A9_1_res = h_A9_1
 let h_A9_2 = { nodes = nodes_1 ; succ = succ_1_1 ; var = var_u_1 }
 let h_A9_2_res = { nodes = nodes_1 ; succ = succ_1_0 ; var = var_u_1 }
-let h_A9' = { nodes = nodes_12 ; succ = succ_1_2 ; var = VarMap.add "w" 2 var_u_1 }
-let h_A9'_res = { nodes = nodes_12 ; succ = succ_1_0 ; var = VarMap.add "w" 2 var_u_1 }
+let h_A9' = { nodes = nodes_12 ; succ = succ_1_2 ; var = VariableMap.add "w" 2 var_u_1 }
+let h_A9'_res = { nodes = nodes_12 ; succ = succ_1_0 ; var = VariableMap.add "w" 2 var_u_1 }
 let h_A9''_1 = { nodes = nodes_1234 ; succ = succ_134_2_0 ; var = var_u_1 }
 let h_A9''_1_res = { nodes = nodes_1234 ; succ = succ_1_0_34_2_0 ; var = var_u_1 }
-let h_A9''_2 = { nodes = nodes_123 ; succ = succ_123_2 ; var = VarMap.add "p" 2 var_u_1 }
-let h_A9''_2_res = { nodes = nodes_123 ; succ = succ_1_0_23_2 ; var = VarMap.add "p" 2 var_u_1 }
+let h_A9''_2 = { nodes = nodes_123 ; succ = succ_123_2 ; var = VariableMap.add "p" 2 var_u_1 }
+let h_A9''_2_res = { nodes = nodes_123 ; succ = succ_1_0_23_2 ; var = VariableMap.add "p" 2 var_u_1 }
 let h_A9''' = { nodes = nodes_123 ; succ = succ_13_2_0 ; var = var_u_1 }
 let h_A9'''_res = { nodes = nodes_13 ; succ = succ_13_0 ; var = var_u_1 }
 let h_A9'''' = { nodes = nodes_12 ; succ = succ_12_2 ; var = var_u_1 }
@@ -106,8 +106,8 @@ let suite = "L2CA">:::
         print_endline (Ca_seq.pprint_seq stmt_actual) ;
         end ;
         assert_equal true (NodeSet.equal heap_exp.nodes heap_actual.nodes) ?msg:(Some "nodes differ") ;
-        assert_equal true (SuccMap.equal (=) heap_exp.succ heap_actual.succ) ?msg:(Some "succ differs") ;
-        assert_equal true (VarMap.equal (=) heap_exp.var heap_actual.var) ?msg:(Some "vars differ") ;
+        assert_equal true (NodeMap.equal (=) heap_exp.succ heap_actual.succ) ?msg:(Some "succ differs") ;
+        assert_equal true (VariableMap.equal (=) heap_exp.var heap_actual.var) ?msg:(Some "vars differ") ;
         assert_equal stmt_exp stmt_actual ?msg:(Some "stmts differ")
       ) res exp
     )
