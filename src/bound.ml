@@ -126,7 +126,8 @@ let get_local_bounds ctx man env vars ca_seq abs_map_ca (init_ca_loc,init_abs_ma
     Debugger.debug "local_bound_ranked" "    SCC %d\n%!" i ;
     Debugger.debug "local_bound_ranked" "      %s\n%!" (Ca_seq.G.pprint_stats scc_seq) ;
     Debugger.debug "local_bound_ranked" "      Propagating equalities\n%!" ;
-    let scc_seq = Ca_seq.propagate_equalities scc_seq in (* TODO is this sound? *)
+    (* ATTENTION: this is sound only because we do this per SSC *)
+    let scc_seq = Ca_seq.propagate_equalities scc_seq in
     Debugger.debug "local_bound_ranked" "      Computing SCA of seq CA\n%!" ;
     let scc_sca = Ca_sca.of_seq ctx vars scc_seq in
     Debugger.debug "local_bound_ranked" "      Computing map edge -> ranking vars\n%!" ;
