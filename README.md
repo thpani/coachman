@@ -1,4 +1,4 @@
-# Coachman [![Build Status](https://travis-ci.org/thpani/coachman.svg?branch=master)](https://travis-ci.org/thpani/coachman)
+# Coachman [![Build Status](https://travis-ci.org/thpani/coachman.svg?branch=master)](https://travis-ci.org/thpani/coachman) [![Docker Build Status](https://img.shields.io/docker/build/thpani/coachman.svg)](https://hub.docker.com/r/thpani/coachman/) [![FORSYTE group](https://img.shields.io/badge/from-vienna-blue.svg)](http://forsyte.at/)
 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/82047/39621966-d8711dec-4f90-11e8-9792-7c31968157c6.jpg">
 Coachman is a COmplexity Analyzer for Concurrent Heap-MANipulating programs.
