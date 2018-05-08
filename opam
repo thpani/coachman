@@ -7,9 +7,9 @@ homepage: "https://github.com/thpani/coachman"
 bug-reports: "https://github.com/thpani/coachman/issues"
 dev-repo: "https://github.com/thpani/coachman"
 build: make
-build-test: [make "test_all"]
+build-test: [make "test"]
 install: [make "prefix=%{prefix}%" "install"]
-remove: ["ocamlfind" "remove" "coachman"]
+remove: [make "prefix=%{prefix}%" "uninstall"]
 depends: [
   "ocamlfind" {build} "ounit" {test} "apron" "ocamlgraph" "z3"
 ]

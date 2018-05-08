@@ -32,3 +32,6 @@ doc:
 
 install: native
 	install -m 0755 coachman.native $(prefix)/bin/coachman
+
+uninstall: native
+	rm -f $(prefix)/bin/coachman
