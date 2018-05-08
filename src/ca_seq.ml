@@ -1,5 +1,12 @@
 open Ca_vertex
 
+(* This implements
+ *  Ahmed Bouajjani, Marius Bozga, Peter Habermehl, Radu Iosif, Pierre Moro, Tomás Vojnar:
+ *  Programs with lists are counter automata. Formal Methods in System Design 38(2): 158-192 (2011)
+ *
+ * On top, we add support for atomic transitions composed of multiple commands.
+ *) 
+
 (* type declarations {{{ *)
 
 type identifier = string
