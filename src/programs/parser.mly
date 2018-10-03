@@ -14,17 +14,17 @@
 %token DO
 %token OD
 %token ASGN
+%token ATOMIC
 %token NULL
 %token TRUE
 %token FALSE
+%token NONDET
 %token NEW
 %token NEXT
 %token EQ
 %token SEMI
 %token NEG
 %token EOF
-%token LANGLE
-%token RANGLE
 %token CAS
 %token COMMA
 %token LPAREN
@@ -52,7 +52,7 @@ seq_stmt:
   ;
 
 statement:
-  | LANGLE seq_stmt RANGLE SEMI               { Atomic ($2) }
+  | ATOMIC BEGIN seq_stmt END                 { Atomic ($3) }
   | ASSUME LPAREN bexpr RPAREN SEMI           { Assume ($3) }
   | BREAK SEMI                                { Break }
   | CONTINUE SEMI                             { Continue }
@@ -76,8 +76,9 @@ pexpr_null:
   ;
 
 bexpr:
-  | TRUE  { True }
-  | FALSE { False }
+  | FALSE  { False }
+  | TRUE   { True }
+  | NONDET { Nondet }
   | pexpr EQ pexpr_null    { Eq($1, $3) }
   | NEG LPAREN bexpr RPAREN   { Neg($3) }
   | CAS LPAREN pexpr COMMA ID COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7, $9) }

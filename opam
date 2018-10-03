@@ -5,7 +5,7 @@ maintainer: "Thomas Pani <thomas.pani@gmail.com>"
 authors: "Thomas Pani <thomas.pani@gmail.com>"
 homepage: "https://github.com/thpani/coachman"
 bug-reports: "https://github.com/thpani/coachman/issues"
-dev-repo: "https://github.com/thpani/coachman"
+dev-repo: "git+https://github.com/thpani/coachman"
 build: make
 build-test: [make "test"]
 install: [make "prefix=%{prefix}%" "install"]
