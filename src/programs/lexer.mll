@@ -10,6 +10,7 @@ let newline = '\r' | '\n' | "\r\n"
 
 rule token = parse
   | "def" { DEF }
+  | "atomic" { ATOMIC }
   | "begin" { BEGIN }
   | "end" { END }
   | "if" { IF }
@@ -28,13 +29,12 @@ rule token = parse
   | "CAS" { CAS }
   | "true" { TRUE }
   | "false" { FALSE }
+  | "nondet" { NONDET }
   | "assume" { ASSUME }
   | '=' { EQ }
   | ';' { SEMI }
   | ',' { COMMA }
   | '!' { NEG }
-  | '<' { LANGLE }
-  | '>' { RANGLE }
   | '(' { LPAREN }
   | ')' { RPAREN }
   | white { token lexbuf }

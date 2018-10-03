@@ -560,13 +560,13 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   Ca_seqDot.write_dot ca_pruned dot_basename "ca_seq_pruned" ;
   (* Ca_relDot.write_dot ca_rel dot_basename "rel_pruned" ; *)
   (* Ca_scaDot.write_dot ca_sca dot_basename "sca_pruned" ; *)
-  (* List.iteri (fun i scc_seq -> *)
-  (*   let scc_rel = Ca_rel.of_seq ctx scc_seq in *)
-  (*   let scc_sca = Ca_sca.of_rel ctx vars scc_rel in *)
-  (*   Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ; *)
-  (*   Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ; *)
-  (*   Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i) *)
-  (* ) (Ca_seq.G.sccs ca_pruned) ; *)
+  List.iteri (fun i scc_seq ->
+    (* let scc_rel = Ca_rel.of_seq ctx scc_seq in *)
+    (* let scc_sca = Ca_sca.of_rel ctx vars scc_rel in *)
+    Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ;
+    (* Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ; *)
+    (* Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i) *)
+  ) (Ca_seq.G.sccs ca_pruned) ;
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
 
