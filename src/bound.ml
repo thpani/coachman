@@ -81,9 +81,12 @@ let min_bound ctx b b' =
 (** [itvl_width itvl] returns [None] if the interval is bottom, otherwise [Some w] where [w] is [upper(itvl)-lower(itvl)]. *)
 let itvl_width itvl =
   let lower, upper = itvl.Apron.Interval.inf, itvl.Apron.Interval.sup in
-  if (Apron.Scalar.is_infty lower) <> 0 || (Apron.Scalar.is_infty upper) <> 0 then
-    None
+  if (Apron.Scalar.is_infty lower) = 1 || (Apron.Scalar.is_infty upper) = -1 then
+    Some 0 (* infeasible *)
+  else if (Apron.Scalar.is_infty lower) = (-1) || (Apron.Scalar.is_infty upper) = 1 then
+    None (* unbounded *)
   else
+    (* extract greatest interval *)
     let lower = match lower with Apron.Scalar.Mpqf i -> i | _ -> assert false in
     let upper = match upper with Apron.Scalar.Mpqf i -> i | _ -> assert false in
     let lower = int_of_string (Mpqf.to_string lower) in
