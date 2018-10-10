@@ -609,7 +609,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
               else
                 const_bound_1 ctx
         in
-        (* Debugger.debug "bound" "folded bound for %s: %s\n" (Cfg.pprint_edge edge) (pprint edge_bound) ; *)
+        (* Debugger.debug "bound" "folded bound for %s: %s\n" (Cfg.G.pprint_edge edge) (pprint edge_bound) ; *)
         let bound_map = match edge_type with
         | Scfg.E effect_name ->
             (* the edge is bounded by `bound'; multiply by (N-1) *)
