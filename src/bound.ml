@@ -589,6 +589,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
 
     let edge_bound_map, summary_bounds_map =
       Cfg.G.fold_edges_e (fun edge (acc_edge_bound_map, acc_env_bound_map) ->
+        (* Debugger.debug "bound" "    Folding bound for %s:\n" (Cfg.G.pprint_edge edge) ; *)
         let f, (_,edge_type), t = edge in
         (* For edge f->t, get a list of local bounds (at most one for each f->t edge in the CA) *)
         let edge_bound =
