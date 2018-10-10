@@ -102,7 +102,7 @@ let get_ub_invariant var scc abs_map =
       let man = Apron.Abstract1.manager absv in
       let itvl = Apron.Abstract1.bound_variable man absv apron_var in
       match itvl_width itvl with
-      | None -> Some greatest_width
+      | None -> None
       | Some this_width -> Some (max greatest_width this_width)
   ) scc (Some 0)
 
