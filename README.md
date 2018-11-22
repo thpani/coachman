@@ -51,6 +51,6 @@ $ export LD_LIBRARY_PATH="$(ocamlfind printconf destdir)/z3:${LD_LIBRARY_PATH}"
 
 # References
 
-[1] A. Bouajjani, M. Bozga, P. Habermehl, R. Iosif, P. Moro, and T. Vojnar, “Programs with lists are counter automata,” Formal Methods in System Design, vol. 38, no. 2, pp. 158–192, 2011.  
-[2] T. Pani, G. Weissenbacher, F. Zuleger, “Rely-Guarantee Reasoning for Automated Complexity Analysis of Non-Blocking Algorithms,” Note: under submission.  
-[3] M. Sinn, F. Zuleger, and H. Veith, “Complexity and resource bound analysis of imperative programs using difference constraints,” J. Autom. Reasoning, vol. 59, no. 1, pp. 3–45, 2017.
+[1] A. Bouajjani, M. Bozga, P. Habermehl, R. Iosif, P. Moro, and T. Vojnar: “Programs with lists are counter automata”. Formal Methods in System Design, vol. 38, no. 2, pp. 158–192, 2011.  
+[2] T. Pani, G. Weissenbacher, F. Zuleger: “Rely-Guarantee Reasoning for Automated Complexity Analysis of Non-Blocking Algorithms”. In: 2018 Formal Methods in Computer Aided Design (FMCAD 2018) (to appear), 2018.
+[3] M. Sinn, F. Zuleger, and H. Veith: “Complexity and resource bound analysis of imperative programs using difference constraints”. J. Autom. Reasoning, vol. 59, no. 1, pp. 3–45, 2017.
