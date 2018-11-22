@@ -37,13 +37,13 @@ let rec pprint_bexpr = function
   | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
   | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
 
-let rec pprint_stmt ?(sep=";\n") = function
+let rec pprint_stmt = function
   | Assume g -> Printf.sprintf "assume(%s)" (pprint_bexpr g)
   | Alloc p      -> Printf.sprintf "%s := new" (pprint_pexpr p)
   | Asgn (a, b)  -> Printf.sprintf "%s := %s" (pprint_pexpr a) (pprint_pexpr b)
 
 and pprint_seq ?(sep=";\n") stmts =
-  String.concat sep (List.map (pprint_stmt ~sep:sep) stmts)
+  String.concat sep (List.map (pprint_stmt) stmts)
 
 (* }}} *)
 
