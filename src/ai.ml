@@ -94,7 +94,7 @@ let linexpr_of_z3 env ctx expr =
       let rhs_var = Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl expr)) in
       0, [ 1, rhs_var ]
     else if Expr.is_numeral expr then
-      let rhs_num = Arithmetic.Integer.get_int expr in
+      let rhs_num = Util.Z3.get_int expr in
       rhs_num, []
     else begin
       if not (Arithmetic.is_add expr) then raise (Invalid_argument (Printf.sprintf "Expecting expr of equality to be addition: %s" (Expr.to_string expr))) ;
@@ -103,12 +103,12 @@ let linexpr_of_z3 env ctx expr =
         if Expr.is_const arg then
           const, ( 1, Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl arg)) ) :: vars
         else if Expr.is_numeral arg then
-          const + (Arithmetic.Integer.get_int arg), vars
+          const + (Util.Z3.get_int arg), vars
         else begin
           if not (Arithmetic.is_mul arg) then raise (Invalid_argument (Printf.sprintf "Expecting addends to be multiplications: %s" (Expr.to_string arg))) ;
           if not ((Expr.get_num_args arg) = 2) then raise (Invalid_argument (Printf.sprintf "Expecting addends to be linear: %s" (Expr.to_string arg))) ;
           match Expr.get_args arg with
-          | [ c ; arg ] -> const, ( Arithmetic.Integer.get_int c, Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl arg)) ) :: vars
+          | [ c ; arg ] -> const, (Util.Z3.get_int c, Symbol.get_string (FuncDecl.get_name (Expr.get_func_decl arg)) ) :: vars
           | _ -> assert false
         end
       ) (0, []) add_args in
@@ -179,7 +179,7 @@ let absv_rel man env absv (expr, highest_prime) =
       let linexpr = linexpr_of_z3 env ctx lhs in
       assert (Coeff.equal_int (Linexpr1.get_cst linexpr) 0) ;
       let rhs = List.nth args 1 in
-      let cst = Arithmetic.Integer.get_int rhs in
+      let cst = Util.Z3.get_int rhs in
       Linexpr1.set_cst linexpr (Coeff.s_of_int (-cst)) ;
       if neg && (comparison = Lincons1.SUP) then ((* flip coefficients *)
         let vars, _ = Environment.vars env in

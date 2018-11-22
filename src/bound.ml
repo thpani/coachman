@@ -381,7 +381,7 @@ let refine_init_constraints_with_env_bounds constraints env_bound_map =
     match bound with
     | Bound expr ->
         if Z3.Expr.is_numeral expr then
-          let bound = Z3.Arithmetic.Integer.get_int expr in
+          let bound = Util.Z3.get_int expr in
           let interval = Apron.Interval.of_int 0 bound in
           let var_name = summary_ctr summary_name in
           VariableMap.add var_name interval acc_constr
@@ -666,8 +666,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   done ;
   !result
 
-let get_numeral = Z3.Arithmetic.Integer.get_int
-let get_numeral_opt e = if Z3.Expr.is_numeral e then Some (get_numeral e) else None
+let get_numeral_opt e = if Z3.Expr.is_numeral e then Some (Util.Z3.get_int e) else None
 
 (** Map any edge to [0] (black). *)
 let default_get_color _ = 0
