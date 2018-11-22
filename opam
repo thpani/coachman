@@ -1,7 +1,7 @@
 opam-version: "1.2"
 name: "coachman"
 version: "~unknown"
-synopsis: "A complexity analyzer for concurrent heap-manipulating programs."
+synopsis: "A complexity analyzer for concurrent heap-manipulating programs"
 maintainer: "Thomas Pani <thomas.pani@gmail.com>"
 authors: "Thomas Pani <thomas.pani@gmail.com>"
 homepage: "https://github.com/thpani/coachman"
