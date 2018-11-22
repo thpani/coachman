@@ -69,7 +69,7 @@ let rec of_z3_expr e =
   Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
   let e = Z3.Expr.simplify e (Some params) in
   if Z3.Expr.is_numeral e then
-    Const (Pervasives.min (Z3.Arithmetic.Integer.get_int e) 1)
+    Const (Pervasives.min (Util.Z3.get_int e) 1)
   else if Z3.Expr.is_const e then
     Linear (string_of_z3_symbol e)
   else if Z3.Arithmetic.is_add e then

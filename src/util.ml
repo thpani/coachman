@@ -43,6 +43,9 @@ module Z3 = struct
   (** [mk_const ctx id] makes an integer constant of name [id]. *)
   let mk_const ctx id = Arithmetic.Integer.mk_const_s ctx id
 
+  (** Retrieve the int value. **)
+  let get_int e = Big_int.int_of_big_int (Z3.Arithmetic.Integer.get_big_int e)
+
   (** [mk_const' ctx num_primes id] makes an integer constant with name [id^(num_primes)], e.g., [mkconst' ctx 4 "a" -> "a''''"]. *)
   let mk_const' ctx num_primes id =
     let id' = id ^ (String.make num_primes '\'') in
