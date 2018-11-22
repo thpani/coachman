@@ -81,13 +81,13 @@ let rec from_ast_bexpr = function
   | Ast.Neg a -> Neg (from_ast_bexpr a)
   | Ast.CAS _ -> raise (Invalid_argument "CAS should have been rewritten as atomic assume/assign")
 
-let rec from_ast_stmt = function
+let from_ast_stmt = function
   | Ast.Assume b -> Assume (from_ast_bexpr b)
   | Ast.Alloc p -> Alloc (from_ast_pexpr p)
   | Ast.Asgn (a, b) -> Asgn (from_ast_pexpr a, from_ast_pexpr b)
   | s -> raise (Invalid_argument (Printf.sprintf "%s should not appear as CFG stmt" (Ast.pprint_stmt s)))
 
-let rec from_ast_seq = List.map from_ast_stmt
+let from_ast_seq = List.map from_ast_stmt
 
 let to_ast_pexpr = function
   | Null -> Ast.Null
@@ -100,7 +100,7 @@ let rec to_ast_bexpr = function
   | Eq (a, b) -> Ast.Eq (to_ast_pexpr a, to_ast_pexpr b)
   | Neg a ->  Ast.Neg (to_ast_bexpr a)
 
-let rec to_ast_stmt = List.map (function
+let to_ast_stmt = List.map (function
   | Assume b -> Ast.Assume (to_ast_bexpr b)
   | Alloc p -> Ast.Alloc (to_ast_pexpr p)
   | Asgn (a, b) -> Ast.Asgn (to_ast_pexpr a, to_ast_pexpr b)
