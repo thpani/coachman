@@ -46,7 +46,8 @@ We assume you have a recent version of OCaml and opam installed.
 $ git clone https://github.com/thpani/coachman.git coachman
 $ opam pin add -n coachman coachman
 $ opam depext -i coachman
-$ export LD_LIBRARY_PATH="$(ocamlfind printconf destdir)/z3:${LD_LIBRARY_PATH}"
+$ export LD_LIBRARY_PATH="$(opam config var z3:lib)/z3:${LD_LIBRARY_PATH}"     # for Linux
+$ export DYLD_LIBRARY_PATH="$(opam config var z3:lib)/z3:${LD_LIBRARY_PATH}"   # for MacOS
 ```
 
 # References
