@@ -1,8 +1,8 @@
-FROM ocaml/opam
+FROM ocaml/opam2
 
 # update opam
-RUN cd opam-repository && git pull
-RUN opam update
+RUN git pull
+RUN cd ..
 
 # update apt
 RUN sudo apt-get update
