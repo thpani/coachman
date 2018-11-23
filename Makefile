@@ -19,9 +19,13 @@ e2e:
 	$(OCB) -I test/e2e e2e_all.native
 
 test_unit: unit
+	DYLD_LIBRARY_PATH=`opam config var z3:lib` \
+	LD_LIBRARY_PATH=`opam config var z3:lib` \
 	./unit_all.native
 
 test_e2e: e2e
+	DYLD_LIBRARY_PATH=`opam config var z3:lib` \
+	LD_LIBRARY_PATH=`opam config var z3:lib` \
 	./e2e_all.native
 
 test: test_unit test_e2e
