@@ -1,7 +1,9 @@
+(** Return the current position in [lexbuf] as string. *)
 let position_string lexbuf =
   let pos = lexbuf.Lexing.lex_curr_p in
   Printf.sprintf "%d:%d" pos.Lexing.pos_lnum (pos.Lexing.pos_cnum - pos.Lexing.pos_bol + 1)
 
+(** Parse the file at [path] using parser [p] and lexer [l]. *)
 let parse path p l =
   let input = open_in path in
   let lexbuf = Lexing.from_channel input in
@@ -16,19 +18,23 @@ let parse path p l =
     Printf.eprintf "[Parser error] %s @ %s\n" path (position_string lexbuf) ;
     exit (1)
 
+(** Parse the heap file at [path]. *)
 let parse_heap path =
   let parsed = parse path Parser_heap.heaps Lexer_heap.token in
   Ca_seq.structure_from_parsed_heaps parsed
 
+(** Parse the program file at [path]. *)
 let parse_program path =
   parse path Parser.program Lexer.token
 
+(** Print a list of strings concatenated by "||". *)
 let pprint_summaries = function
   | [] -> "∅"
   | summaries ->
     let print_g (s,_) = Printf.sprintf "G(%s)" s in
     summaries |> List.map print_g |> String.concat " || "
 
+(** Sequentialize the AST [ast] with stateless atomic summaries [summaries]. *)
 let sequentialize ast summaries =
   let cfg                = Cfg.of_ast ast in
   let cfg_with_summaries = Cfg.add_summaries cfg summaries in
