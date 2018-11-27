@@ -26,7 +26,8 @@ let parse_program path =
 let pprint_summaries = function
   | [] -> "∅"
   | summaries ->
-    String.concat " || " (List.map (fun s -> Printf.sprintf "G(%s)" (fst s)) summaries)
+    let print_g (s,_) = Printf.sprintf "G(%s)" s in
+    summaries |> List.map print_g |> String.concat " || "
 
 let sequentialize ast summaries =
   let cfg                = Cfg.of_ast ast in
