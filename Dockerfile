@@ -1,7 +1,7 @@
 FROM ocaml/opam2
 
 # update opam
-RUN git pull
+RUN opam update
 RUN cd ..
 
 # update apt
