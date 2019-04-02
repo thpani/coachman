@@ -18,5 +18,6 @@ rule token = parse
   | ';' { SEMI }
   | int { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | ['_' 'a'-'z' 'A'-'Z']['_' 'A'-'Z' 'a'-'z' '0'-'9' '\'']* as i { ID(i) }
+  | '#' [^ '\r' '\n']* newline { new_line lexbuf ; token lexbuf }
   | _ { raise (Error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof  { EOF }
