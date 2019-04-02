@@ -1,0 +1,23 @@
+# Modeled after Java's java.util.concurrent.atomic.AtomicReference
+# https://docs.oracle.com/javase/10/docs/api/java/util/concurrent/atomic/AtomicReference.html
+#
+# Author: Lukas Gelbmann
+
+def get begin
+  value := Value;
+end
+
+def set begin
+  new_value := new;
+  CAS(Value, Value, new_value, Modify);
+end
+
+def getAndSet begin
+  new_value := new;
+  while true do
+    value := Value;
+    if CAS(Value, value, new_value, Modify) then
+      break;
+    fi
+  od
+end

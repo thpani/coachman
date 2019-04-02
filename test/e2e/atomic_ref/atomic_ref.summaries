@@ -1,0 +1,5 @@
+# Author: Lukas Gelbmann
+
+def Modify begin
+  Value := new;
+end
