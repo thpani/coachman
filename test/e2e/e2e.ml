@@ -11,7 +11,10 @@ let test ?(ai=false) component fn_prog fn_heap fn_summary fun_name exp _ =
   let init_heaps = Main.parse_heap fn_heap in
   let functions = Main.parse_program fn_prog in
   let summaries = Main.parse_program fn_summary in
-  let prog = List.assoc fun_name functions in
+  let prog = match fun_name with 
+  | "" -> Ast.build_nondet_switch functions
+  | fun_name -> List.assoc fun_name functions
+  in
   let cfg_with_summaries, get_color = Main.sequentialize prog summaries in
   let edge_bound_map = Bound.compute_bounds ~get_edge_color:get_color init_heaps cfg_with_summaries in
   List.iter (fun (f,ek,t,exp) ->
@@ -24,6 +27,6 @@ let test ?(ai=false) component fn_prog fn_heap fn_summary fun_name exp _ =
         (Complexity.pprint exp)
       in
       assert_equal ~msg:msg complexity exp
-    with Not_found ->
-      assert_failure (Cfg.G.pprint_cfg_edge (f,ek,t))
-  )  exp
+  with Not_found ->
+    assert_failure (Cfg.G.pprint_cfg_edge (f,ek,t))
+    )  exp
