@@ -10,7 +10,7 @@ let suite_tas = "TAS" >::: [
       3, Scfg.effect_ID, 3, Complexity.Unbounded ;
       3, Scfg.E "Lock", 11, Complexity.Const 1 ;
       7, Scfg.effect_ID, 11, Complexity.Const 0 ;
-      7, Scfg.E "Release", 11, Complexity.Const 1 ;
+      7, Scfg.E "Unlock", 11, Complexity.Const 1 ;
     ] ;
 ]
 

@@ -10,5 +10,5 @@ def lock begin
 end
 
 def unlock begin
-  CAS(LockState, LockState, Unlocked, Release);
+  CAS(LockState, LockState, Unlocked, Unlock);
 end
