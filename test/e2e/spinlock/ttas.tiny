@@ -1,0 +1,16 @@
+# Modeled after the TTAS spinlock from
+#   Maurice Herlihy, Nir Shavit: The Art of Multiprocessor Programming. 2012.
+
+def lock begin
+  while true do
+    if LockState = Unlocked then
+      if CAS(LockState, Unlocked, Locked, Lock) then
+        break;
+      fi
+    fi
+  od
+end
+
+def unlock begin
+  CAS(LockState, LockState, Unlocked, Unlock);
+end
