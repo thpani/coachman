@@ -534,13 +534,13 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* Ai.print_abs_map man env abs_map ca_pruned ; *)
   Debugger.debug "bound" "  %s\n%!" (Ca_seq.G.pprint_stats ca_pruned) ;
 
-  let module Ca_seqDot = Ca_seq.G.Dot (struct
-    type edge = Ca_seq.G.E.t
-    type vertex = Ca_vertex.ca_loc
-    let pprint_vertex v = "\"" ^ (Ca_vertex.pprint v) ^ "\n" ^ (Ai.pprint_absv man (Ai.VertexMap.find v abs_map)) ^ "\""
-    let color_edge = get_edge_color
-    let pprint_edge_label (f,(stmts,e),t) = Printf.sprintf "%s\n%s" (Ca_seq.pprint_seq stmts) (Scfg.pprint_edge_kind e)
-  end) in
+  (* let module Ca_seqDot = Ca_seq.G.Dot (struct *)
+  (*   type edge = Ca_seq.G.E.t *)
+  (*   type vertex = Ca_vertex.ca_loc *)
+  (*   let pprint_vertex v = "\"" ^ (Ca_vertex.pprint v) ^ "\n" ^ (Ai.pprint_absv man (Ai.VertexMap.find v abs_map)) ^ "\"" *)
+  (*   let color_edge = get_edge_color *)
+  (*   let pprint_edge_label (f,(stmts,e),t) = Printf.sprintf "%s\n%s" (Ca_seq.pprint_seq stmts) (Scfg.pprint_edge_kind e) *)
+  (* end) in *)
   (* let module Ca_relDot = Ca_rel.G.Dot (struct *)
   (*   type edge = Ca_rel.G.E.t *)
   (*   type vertex = Ca_vertex.ca_loc *)
@@ -559,17 +559,17 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   (* Debugger.debug "bound" "Abstracting CA...\n%!" ; *)
   (* let ca_rel = Ca_rel.of_seq ctx ca_pruned in *)
   (* let ca_sca = Ca_sca.of_rel ctx vars ca_rel in *)
-  Ca_seqDot.write_dot ca_seq dot_basename "ca_seq" ;
-  Ca_seqDot.write_dot ca_pruned dot_basename "ca_seq_pruned" ;
+  (* Ca_seqDot.write_dot ca_seq dot_basename "ca_seq" ; *)
+  (* Ca_seqDot.write_dot ca_pruned dot_basename "ca_seq_pruned" ; *)
   (* Ca_relDot.write_dot ca_rel dot_basename "rel_pruned" ; *)
   (* Ca_scaDot.write_dot ca_sca dot_basename "sca_pruned" ; *)
-  List.iteri (fun i scc_seq ->
+  (* List.iteri (fun i scc_seq -> *)
     (* let scc_rel = Ca_rel.of_seq ctx scc_seq in *)
     (* let scc_sca = Ca_sca.of_rel ctx vars scc_rel in *)
-    Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ;
+    (* Ca_seqDot.write_dot scc_seq dot_basename (Printf.sprintf "scc_seq_%d" i) ; *)
     (* Ca_relDot.write_dot scc_rel dot_basename (Printf.sprintf "scc_rel_%d" i) ; *)
     (* Ca_scaDot.write_dot scc_sca dot_basename (Printf.sprintf "scc_sca_%d" i) *)
-  ) (Ca_seq.G.sccs ca_pruned) ;
+  (* ) (Ca_seq.G.sccs ca_pruned) ; *)
 
   Debugger.debug "bound" "Computing bounds...\n%!" ;
 
