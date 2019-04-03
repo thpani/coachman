@@ -1,0 +1,23 @@
+def push begin
+  node := new;
+  while true do
+    top := ToS;
+    node.next := top;
+    if CAS(ToS, top, node, push) then
+      break;
+    fi
+  od
+end
+
+def pop begin
+  while true do
+    top := ToS;
+    if top = null then
+      continue;
+    fi
+    node := top.next;
+    if CAS(ToS, top, node, pop) then
+      break;
+    fi
+  od
+end
