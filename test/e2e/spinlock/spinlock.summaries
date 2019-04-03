@@ -1,0 +1,8 @@
+def Lock begin
+  assume(LockState = Unlocked);
+  LockState := Locked;
+end
+
+def Unlock begin
+  LockState := Unlocked;
+end
