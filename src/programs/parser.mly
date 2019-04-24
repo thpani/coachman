@@ -10,6 +10,7 @@
 %token FI
 %token BREAK
 %token CONTINUE
+%token RETURN
 %token WHILE
 %token DO
 %token OD
@@ -56,6 +57,7 @@ statement:
   | ASSUME LPAREN bexpr RPAREN SEMI           { Assume ($3) }
   | BREAK SEMI                                { Break }
   | CONTINUE SEMI                             { Continue }
+  | RETURN SEMI                               { Return }
   | IF bexpr THEN seq_stmt ELSE seq_stmt FI   { IfThenElse ($2, $4, $6) }
   | IF bexpr THEN seq_stmt FI                 { IfThenElse ($2, $4, []) }
   | WHILE bexpr DO seq_stmt OD                { While ($2, $4) }

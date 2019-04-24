@@ -26,6 +26,7 @@ rule token = parse
   | ".next" { NEXT }
   | "break" { BREAK }
   | "continue" { CONTINUE }
+  | "return" { RETURN }
   | "CAS" { CAS }
   | "true" { TRUE }
   | "false" { FALSE }

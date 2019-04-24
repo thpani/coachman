@@ -176,8 +176,10 @@ let of_ast ast =
   let continue_target = ref 0 in
   let did_goto = ref false in
   let g = G.Imp.create() in
+  G.Imp.add_vertex g !last ;
   let max_vertex g = G.Imp.fold_vertex (fun v a -> max v a) g 0 in
   let next_vertex g = (max_vertex g) + 1 in
+  let func_exit = -1 in
   let rec gen_cfg ast =
     List.iter (function
       | Ast.IfThenElse (guard, sif, selse) ->
@@ -235,6 +237,9 @@ let of_ast ast =
           did_goto := true
       | Ast.Continue ->
           G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), !continue_target) ;
+          did_goto := true
+      | Ast.Return ->
+          G.Imp.add_edge_e g (!last, ([Assume True], Scfg.effect_ID), func_exit) ;
           did_goto := true
       | Ast.Atomic stmt ->
         let next_v = next_vertex g in

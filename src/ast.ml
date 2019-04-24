@@ -20,6 +20,7 @@ type stmt =
   | Assume of bexpr
   | Break
   | Continue
+  | Return
   | IfThenElse of bexpr * stmt list * stmt list
   | While of bexpr * stmt list
   | Alloc of pexpr
@@ -51,6 +52,7 @@ let rec pprint_stmt ?(sep=";\n") = function
   | Assume g -> Printf.sprintf "assume(%s)" (pprint_bexpr g)
   | Break    -> "break"
   | Continue -> "continue"
+  | Return -> "return"
   | IfThenElse (CAS(a, b, c, _), [], []) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
   | IfThenElse (g, sif, selse) -> String.concat "\n" [ "if " ^ (pprint_bexpr g) ; pprint_seq ~sep sif ; "else" ; pprint_seq ~sep selse ; "fi" ]
   | While (g, s)     -> String.concat "\n" [ "while " ^ (pprint_bexpr g) ^ " do" ; pprint_seq ~sep s ; "od" ]
