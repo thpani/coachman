@@ -7,7 +7,7 @@ read -d '' awkScript <<'EOF'
     ($6 == "ID" ? "Scfg.effect_ID" : ("Scfg.E \\"" $6 "\\"")) ", " \
     $4 ", " \
     "Complexity." \
-    ($8 == "N" ? "Linear \"N\"" : ($8 == "∞" ? "Unbounded" : "Const " $8)) " ;"
+    ($8 == "N" ? "Linear \\"N\\"" : ($8 == "∞" ? "Unbounded" : "Const " $8)) " ;"
 }
 EOF
 
