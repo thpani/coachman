@@ -30,8 +30,8 @@ rule token = parse
   | "CAS" { CAS }
   | "true" { TRUE }
   | "false" { FALSE }
-  | "nondet" { NONDET }
   | "assume" { ASSUME }
+  | '*' { NONDET }
   | '=' { EQ }
   | ';' { SEMI }
   | ',' { COMMA }
