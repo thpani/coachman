@@ -1,0 +1,23 @@
+def Add1 begin
+  __node := new;
+  __node.next := ToS1;
+  ToS1 := __node;
+  __node := null;
+end
+
+def Add2 begin
+  __node := new;
+  __node.next := ToS2;
+  ToS2 := __node;
+  __node := null;
+end
+
+def Remove1 begin
+  assume(!(ToS1 = null));
+  ToS1 := ToS1.next;
+end
+
+def Remove2 begin
+  assume(!(ToS2 = null));
+  ToS2 := ToS2.next;
+end

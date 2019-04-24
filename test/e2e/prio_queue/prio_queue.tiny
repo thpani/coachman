@@ -1,0 +1,43 @@
+def add begin
+  node := new;
+  if * then
+    while true do
+      top := ToS1;
+      node.next := top;
+      if CAS(ToS1, top, node, Add1) then
+        break;
+      fi
+    od
+  else
+    while true do
+      top := ToS2;
+      node.next := top;
+      if CAS(ToS2, top, node, Add2) then
+        break;
+      fi
+    od
+  fi
+end
+
+def removeMin begin
+  while true do
+    top := ToS1;
+    if top = null then
+      break;
+    fi
+    node := top.next;
+    if CAS(ToS1, top, node, Remove1) then
+      return;
+    fi
+  od
+  while true do
+    top := ToS2;
+    if top = null then
+      return;
+    fi
+    node := top.next;
+    if CAS(ToS2, top, node, Remove2) then
+      return;
+    fi
+  od
+end
