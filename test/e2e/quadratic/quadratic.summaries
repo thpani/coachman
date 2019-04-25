@@ -1,0 +1,7 @@
+def ModifyA begin
+  A := new;
+end
+
+def ModifyB begin
+  B := new;
+end
