@@ -17,7 +17,11 @@ end
 type t = Bound of Z3.Expr.expr | Unbounded
 
 let pprint = function
-  | Bound e -> Z3.Expr.to_string (Z3.Expr.simplify e None)
+  | Bound e ->
+      let ctx = Config.get_ctx () in
+      let params = Z3.Params.mk_params ctx in
+      Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
+      Z3.Expr.to_string (Z3.Expr.simplify e (Some params))
   | Unbounded -> "∞"
 
 let const_bound ctx i = Bound (Util.Z3.mk_numeral ctx i)
