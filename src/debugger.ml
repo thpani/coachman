@@ -31,7 +31,10 @@ let logf lvl component =
         max 5 (list_max component_lengths)
       in
       let padding = max 0 (longest_component - (String.length component)) in
-      printf "[%s] %s" component (String.make padding ' ');
+      let now = Unix.localtime (Unix.time ()) in
+      (* let date = sprintf "%d-%02d-%02d %02d:%02d:%02d" (now.tm_year+1900) (now.tm_mon+1) now.tm_mday now.tm_hour now.tm_min now.tm_sec in *)
+      let date = sprintf "%02d:%02d:%02d" now.tm_hour now.tm_min now.tm_sec in
+      printf "%s [%s] %s" date component (String.make padding ' ');
       if !print_time then printf "%5.1f " (Sys.time ()) ;
       printf
     end
