@@ -3,7 +3,8 @@ open OUnit2
 open E2e
 
 let suite = "Quadratic" >::: [
-  "(procedure) || G(ModifyA) || G(ModifyB" >:: test "quadratic"
+  "(procedure) || G(ModifyA) || G(ModifyB" >: test_case ~length:Long (
+    test "quadratic"
     "quadratic.tiny" "quadratic.heap" "quadratic/quadratic.summaries" "" [
     0, Scfg.effect_ID, 1, Complexity.Const 1 ;
     1, Scfg.effect_ID, 4, Complexity.Const 1 ;
@@ -13,5 +14,5 @@ let suite = "Quadratic" >::: [
     6, Scfg.effect_ID, 7, Complexity.Linear "N" ;
     7, Scfg.effect_ID, 4, Complexity.Linear "N" ;
     7, Scfg.E "ModifyB", 3, Complexity.Const 1 ;
-  ]
+  ] )
 ]
