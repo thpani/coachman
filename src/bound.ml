@@ -459,7 +459,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   Debugger.info "bound" "Computing bounds for initial heap %s\n%!" (Ca_vertex.pprint init_ca_loc) ;
 
   (* setup dot output *)
-  let dot_basename = Printf.sprintf "%s_heap%d" !Config.dot_basename i in
+  (* let dot_basename = Printf.sprintf "%s_heap%d" !Config.dot_basename i in *)
   (* let dot_basename = dot_basename^(Ca_vertex.pprint_structure (snd init_ca_loc)) in *)
   (* let module Ca_seqDot = Ca_seq.G.Dot (struct *)
   (*   type edge = Ca_seq.G.E.t *)
