@@ -39,31 +39,27 @@ let string_of_z3_symbol e =
 
 (* Conversion from Z3 expressions {{{ *)
 
-let of_z3_mul e =
+let rec of_z3_mul e =
   assert (Z3.Arithmetic.is_mul e) ;
   let mul_args = Z3.Expr.get_args e in
-  let constants = match mul_args with
-    | first_arg :: tail_arg ->
+  match mul_args with
+    | first_arg :: (tail_arg :: []) ->
         if Z3.Expr.is_numeral first_arg then
-          tail_arg
+          of_z3_expr tail_arg
         else
-          mul_args
-    | [] -> assert false
-  in
-  let occ_map = List.fold_left (fun map symbol ->
-    let id = string_of_z3_symbol symbol in
-    let occ = match VariableMap.find_opt id map with Some i -> i+1 | None -> 1 in
-    VariableMap.add id occ map
-  ) VariableMap.empty constants
-  in
-  if (VariableMap.cardinal occ_map) = 1 then
-    let var, exp = VariableMap.min_binding occ_map in
-    if exp = 1 then Linear var
-    else Polynomial (VariableMap.bindings occ_map)
-  else
-    Polynomial (VariableMap.bindings occ_map)
-
-let rec of_z3_expr e =
+          let occ_map = List.fold_left (fun map symbol ->
+            let id = string_of_z3_symbol symbol in
+            let occ = match VariableMap.find_opt id map with Some i -> i+1 | None -> 1 in
+            VariableMap.add id occ map
+          ) VariableMap.empty mul_args in
+          if (VariableMap.cardinal occ_map) = 1 then
+            let var, exp = VariableMap.min_binding occ_map in
+            if exp = 1 then Linear var
+            else Polynomial (VariableMap.bindings occ_map)
+          else
+            Polynomial (VariableMap.bindings occ_map)
+    | _ -> assert false
+and of_z3_expr e =
   let ctx = Config.get_ctx () in
   let params = Z3.Params.mk_params ctx in
   Z3.Params.add_bool params (Z3.Symbol.mk_string ctx "som") true ;
