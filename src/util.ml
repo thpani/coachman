@@ -1,5 +1,21 @@
 (** Helper modules of utility definitions. *)
 
+(* https://gist.github.com/MassD/fa79de3a5ee88c9c5a8e *)
+(* note that in order to preserve certain order 
+   and also show the conciseness of the implementation, 
+   no tail-recursive is used *)
+let ins_all_positions x l =
+  let rec aux prev acc = function
+    | [] -> (prev @ [x]) :: acc |> List.rev
+    | hd::tl as l -> aux (prev @ [hd]) ((prev @ [x] @ l) :: acc) tl
+  in
+  aux [] [] l
+  
+let rec permutations = function
+  | [] -> []
+  | x::[] -> [[x]] (* we must specify this edge case *)
+  | x::xs -> List.fold_left (fun acc p -> acc @ ins_all_positions x p ) [] (permutations xs)
+
 (** Extend module [List] with useful helper functions *)
 module List = struct
   include List
