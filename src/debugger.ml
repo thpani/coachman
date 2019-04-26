@@ -20,9 +20,9 @@ let lvl_of_string = function
 
 let current_level = ref Info
 let current_components : component list ref = ref []
-let print_time = ref false
+let print_time = ref true
 
-let logf lvl component =
+let logf ?(comp=true) lvl component =
   if ord lvl >= ord !current_level && (ord lvl >= ord Info || List.mem component !current_components) then
     begin
       let longest_component = 
@@ -31,11 +31,18 @@ let logf lvl component =
         max 5 (list_max component_lengths)
       in
       let padding = max 0 (longest_component - (String.length component)) in
-      let now = Unix.localtime (Unix.time ()) in
-      (* let date = sprintf "%d-%02d-%02d %02d:%02d:%02d" (now.tm_year+1900) (now.tm_mon+1) now.tm_mday now.tm_hour now.tm_min now.tm_sec in *)
-      let date = sprintf "%02d:%02d:%02d" now.tm_hour now.tm_min now.tm_sec in
-      printf "%s [%s] %s" date component (String.make padding ' ');
-      if !print_time then printf "%5.1f " (Sys.time ()) ;
+      if comp then 
+        begin
+          if !print_time then
+            begin
+              let now = Unix.localtime (Unix.time ()) in
+              (* let date = sprintf "%d-%02d-%02d %02d:%02d:%02d" (now.tm_year+1900) (now.tm_mon+1) now.tm_mday now.tm_hour now.tm_min now.tm_sec in *)
+              let date = sprintf "%02d:%02d:%02d" now.tm_hour now.tm_min now.tm_sec in
+              printf "%s " date
+            end ;
+          printf "[%s] " component ;
+          printf "%s" (String.make padding ' ')
+        end ;
       printf
     end
   else ifprintf stdout
@@ -45,3 +52,8 @@ let error f = logf Error f
 let warn  f = logf Warn  f
 let info  f = logf Info  f
 let debug f = logf Debug f
+
+let error_nocomp f = logf ~comp:false Error f
+let warn_nocomp  f = logf ~comp:false Warn  f
+let info_nocomp  f = logf ~comp:false Info  f
+let debug_nocomp f = logf ~comp:false Debug f
