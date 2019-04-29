@@ -3,8 +3,9 @@ open OUnit2
 let concat_path a b c =
   Filename.concat (Filename.concat a b) c
 
-let test ?(ai=false) component fn_prog fn_heap fn_summary fun_name exp _ =
+let test ?(ai=false) ?(iso=true) component fn_prog fn_heap fn_summary fun_name exp _ =
   Config.use_ai := ai ;
+  Config.iso := iso ;
   let fn_prog = concat_path "test/e2e" component fn_prog in
   let fn_heap = concat_path "test/e2e" component fn_heap in
   let fn_summary = Filename.concat "test/e2e" fn_summary in

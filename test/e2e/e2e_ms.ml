@@ -121,7 +121,7 @@ let suite = "Michael-Scott" >::: [
       16, Scfg.effect_ID,     0, Complexity.Linear "N" ;
       16, Scfg.E "deq",       1, Complexity.Const 1 ;
     ] ;
-  "deq || G(deq)" >:: test "ms"
+  "deq || G(deq)" >:: test ~iso:false "ms"
     "ms.tiny" "ms.heap" "ms/ms.summaries" "deq" [
        0, Scfg.effect_ID,     3, Complexity.Linear "N" ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
