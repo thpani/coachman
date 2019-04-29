@@ -138,5 +138,39 @@ let suite = "Michael-Scott" >::: [
       16, Scfg.E "deq",       1, Complexity.Const 1 ;
     ] ;
   (* }}} *)
+  (* enq [] deq {{{ *)
+  "(enq [] deq) || G(deq) || G(enq)" >:
+		test_case ~length:Long (test "ms"
+    "ms.tiny" "ms.heap" "ms/ms.summaries" "" [
+      0, Scfg.effect_ID, 1, Complexity.Const 1 ;
+      0, Scfg.effect_ID, 24, Complexity.Const 1 ;
+      1, Scfg.effect_ID, 4, Complexity.Const 1 ;
+      4, Scfg.effect_ID, 5, Complexity.Linear "N" ;
+      5, Scfg.effect_ID, 6, Complexity.Linear "N" ;
+      6, Scfg.effect_ID, 4, Complexity.Linear "N" ;
+      6, Scfg.effect_ID, 9, Complexity.Linear "N" ;
+      9, Scfg.effect_ID, 10, Complexity.Linear "N" ;
+      9, Scfg.effect_ID, 17, Complexity.Linear "N" ;
+      10, Scfg.effect_ID, 4, Complexity.Linear "N" ;
+      10, Scfg.E "enq", 11, Complexity.Const 1 ;
+      11, Scfg.effect_ID, 43, Complexity.Const 1 ;
+      11, Scfg.E "enq_swing", 43, Complexity.Const 1 ;
+      17, Scfg.effect_ID, 4, Complexity.Linear "N" ;
+      17, Scfg.E "enq_swing", 4, Complexity.Linear "N" ;
+      24, Scfg.effect_ID, 25, Complexity.Linear "N" ;
+      25, Scfg.effect_ID, 26, Complexity.Linear "N" ;
+      26, Scfg.effect_ID, 27, Complexity.Linear "N" ;
+      27, Scfg.effect_ID, 24, Complexity.Linear "N" ;
+      27, Scfg.effect_ID, 30, Complexity.Linear "N" ;
+      30, Scfg.effect_ID, 31, Complexity.Linear "N" ;
+      30, Scfg.effect_ID, 38, Complexity.Linear "N" ;
+      31, Scfg.effect_ID, 33, Complexity.Linear "N" ;
+      31, Scfg.effect_ID, 43, Complexity.Const 1 ;
+      33, Scfg.effect_ID, 24, Complexity.Linear "N" ;
+      33, Scfg.E "deq_swing", 24, Complexity.Linear "N" ;
+      38, Scfg.effect_ID, 24, Complexity.Linear "N" ;
+      38, Scfg.E "deq", 43, Complexity.Const 1 ;
+  ] ) ;
+  (* }}} *)
 ]
 
