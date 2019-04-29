@@ -69,6 +69,7 @@ end)
 (* }}} *)
 
 let ctr_of_node n = Printf.sprintf "x_%d" n
+let tmp_ctr_of_node n = Printf.sprintf "tmp_x_%d" n
 
 let error_sink = 
   let error_ploc = -99 in
@@ -318,27 +319,73 @@ and of_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
   let g = G.Imp.create () in
   let q = Queue.create () in
   let indent = String.make indent ' ' in
-  let rename_max_node g stmt to_vertex =
-    let to_ploc, heap = to_vertex in
-    let max_elt = NodeSet.max_elt_opt heap.nodes in
-    match max_elt with 
-    | Some max_elt ->
-      let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
-      let enumerated_max = List.fold_left (fun set elt -> NodeSet.add elt set) NodeSet.empty (1--max_elt) in
-      let novel_nodes = NodeSet.diff enumerated_max heap.nodes in
-      let rename_structure h from to_ =
-        let rename_node node = if node = from then to_ else node in
-        let nodes = NodeSet.map rename_node h.nodes in
-        let succ = List.fold_left (fun map (f,t) -> NodeMap.add (rename_node f) (rename_node t) map) NodeMap.empty (NodeMap.bindings h.succ) in
-        let var = List.fold_left (fun map (f,t) -> VariableMap.add f (rename_node t) map) VariableMap.empty (VariableMap.bindings h.var) in
-        { nodes ; succ ; var }
-      in
-      if (NodeSet.cardinal novel_nodes) > 0 then
-        let novel_node = NodeSet.min_elt novel_nodes in
-        Some (max_elt, novel_node, rename_structure heap max_elt novel_node)
+  let find_isomorphic_heap g (to_ploc, heap) =
+    let count_nodes_mapped_to_0 node_map =
+      NodeMap.fold (fun var node num ->
+        match node with 0 -> (num + 1) | _ -> num
+      ) node_map 0
+    in
+    let count_vars_mapped_to_0 var_map =
+      VariableMap.fold (fun var node num ->
+        match node with 0 -> (num + 1) | _ -> num
+      ) var_map 0
+    in
+    let permutation =
+      if (NodeSet.cardinal heap.nodes) < 8 then (
+        let permutations = Util.permutations (NodeSet.elements heap.nodes) in
+        let cand_vertices = G.Imp.fold_vertex (fun (cand_ploc, cand_heap) l ->
+          if cand_ploc = to_ploc &&
+             (NodeSet.cardinal cand_heap.nodes) = (NodeSet.cardinal heap.nodes) &&
+             (count_nodes_mapped_to_0 cand_heap.succ) = (count_nodes_mapped_to_0 heap.succ) &&
+             (VariableMap.cardinal cand_heap.var) = (VariableMap.cardinal heap.var) &&
+             (count_vars_mapped_to_0 cand_heap.var) = (count_vars_mapped_to_0 heap.var)
+          then
+            (cand_ploc, cand_heap) :: l
+          else
+            l
+        ) g []
+        in
+        Util.List.fold_until_some (fun permutation ->
+          let permuted_heap = Ca_vertex.permute heap permutation in
+          match List.find_opt (Ca_vertex.equal (to_ploc, permuted_heap)) cand_vertices with
+          | Some _ -> Some permutation
+          | _ -> None
+        ) permutations
+      )
       else
         None
-    | None -> None
+    in
+    permutation
+  in
+  let rec rename_max_node_fp g tstmt to_vertex =
+    let rename_max_node g (_, heap) =
+      let max_elt = NodeSet.max_elt_opt heap.nodes in
+      match max_elt with 
+      | Some max_elt ->
+        let (--) i j = let rec aux n acc = if n < i then acc else aux (n-1) (n :: acc) in aux j [] in
+        let enumerated_max = List.fold_left (fun set elt -> NodeSet.add elt set) NodeSet.empty (1--max_elt) in
+        let novel_nodes = NodeSet.diff enumerated_max heap.nodes in
+        let rename_structure h from to_ =
+          let rename_node node = if node = from then to_ else node in
+          let nodes = NodeSet.map rename_node h.nodes in
+          let succ = List.fold_left (fun map (f,t) -> NodeMap.add (rename_node f) (rename_node t) map) NodeMap.empty (NodeMap.bindings h.succ) in
+          let var = List.fold_left (fun map (f,t) -> VariableMap.add f (rename_node t) map) VariableMap.empty (VariableMap.bindings h.var) in
+          { nodes ; succ ; var }
+        in
+        if (NodeSet.cardinal novel_nodes) > 0 then
+          let novel_node = NodeSet.min_elt novel_nodes in
+          Some (max_elt, novel_node, rename_structure heap max_elt novel_node)
+        else
+          None
+      | None -> None
+    in
+    match rename_max_node g to_vertex with
+    | Some (rename_from, rename_to, renamed_structure) ->
+        let tstmt = tstmt @ [ Asgn (ctr_of_node rename_to, Id (ctr_of_node rename_from)) ] in
+        Debugger.debug_nocomp "ca_construction" " -rename-> %s (%s)" (pprint (rename_to, renamed_structure)) (pprint_seq ~sep:"; " tstmt) ;
+        rename_max_node_fp g tstmt (fst to_vertex, renamed_structure)
+    | None ->
+        tstmt, to_vertex
   in
   (* add inital vertex to graph and worklist *)
   G.Imp.add_vertex g init_ca_loc ;
@@ -350,23 +397,33 @@ and of_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
     Cfg.G.iter_succ_e (fun (from, (stmt, summary), to_) -> begin
       Debugger.debug "ca_construction" "%s%d -> %d (%s) => %s ->\n" indent from to_ (Cfg.pprint_seq ~sep:"; " stmt) (pprint from_vertex) ;
       let translated = get_next from_vertex stmt summary to_ in
-      List.iter (fun (tstmt, (to_, to_heap)) ->
+      List.iter (fun (tstmt, to_vertex) ->
         let has_assume_false = List.mem (Assume False) tstmt in
         if has_assume_false && not introduce_assume_false then ()
         else begin
           let tstmt = List.filter (fun stmt -> stmt <> Assume True) tstmt in
           let tstmt = match tstmt with [] -> [ Assume True ] | _ -> tstmt in
-          let to_vertex = to_, to_heap in
           Debugger.debug "ca_construction" "%s%s%s (%s)" indent indent (pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
-          let tstmt, to_heap, to_vertex = match rename_max_node g tstmt to_vertex with
-          | Some (rename_from, rename_to, renamed_structure) ->
-              Debugger.debug "ca_construction" " -r-> %s (%s) [0 isomorphic structures found; renaming node]\n" (pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
-              tstmt @ [ Asgn (ctr_of_node rename_to, Id (ctr_of_node rename_from)) ], renamed_structure, (to_, renamed_structure)
-          | None ->
-              Debugger.debug "ca_construction" "\n" ;
-              tstmt, to_heap, (to_, to_heap)
+          let tstmt, to_vertex = rename_max_node_fp g tstmt to_vertex in
+          let tstmt, to_vertex =
+            if introduce_assume_false || G.Imp.mem_vertex g to_vertex then
+              tstmt, to_vertex
+            else
+              match find_isomorphic_heap g to_vertex with
+              | Some permutation ->
+                  let _, to_heap = to_vertex in
+                  let permuted_heap = Ca_vertex.permute to_heap permutation in
+                  let tstmt = tstmt @
+                    (List.map (fun node -> Asgn (tmp_ctr_of_node node, Id (ctr_of_node node))) (NodeSet.elements permuted_heap.nodes)) @
+                    (List.map (fun node -> Asgn (ctr_of_node node, Id (tmp_ctr_of_node ((Util.List.find node permutation)+1)))) (NodeSet.elements permuted_heap.nodes))
+                  in
+                  Debugger.debug_nocomp "ca_construction" " -isomorph-> <%s> %s (%s)" (Util.List.pprint string_of_int permutation) (pprint (to_, permuted_heap)) (pprint_seq ~sep:"; " tstmt);
+                  tstmt, (to_, permuted_heap)
+              | None ->
+                  tstmt, to_vertex
           in
           let has_to_vertex = G.Imp.mem_vertex g to_vertex in
+          Debugger.debug_nocomp "ca_construction" "\n" ;
           G.Imp.add_edge_e g (from_vertex, (tstmt, summary), to_vertex) ;
           if not has_assume_false && not has_to_vertex && not (equal to_vertex error_sink) then Queue.add to_vertex q
         end
