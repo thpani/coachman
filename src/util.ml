@@ -27,6 +27,14 @@ module List = struct
       | [] -> failwith "Not Found"
     in func x lst 0
 
+  (** [List.fold_until_some f [ a1; a2; ... ]] returns the first [ai] for which [f ai] is not None. *)
+  let rec fold_until_some f = function
+    | x :: xs -> ( match f x with
+      | None -> fold_until_some f xs
+      | some -> some
+    )
+    | [] -> None
+
   (** Pretty-print a list. *)
   let pprint formatter lst = "[ " ^ (String.concat ", " (List.map formatter lst)) ^ " ]"
 end
