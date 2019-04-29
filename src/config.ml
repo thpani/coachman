@@ -2,6 +2,7 @@ let dot_basename = ref ""
 let qf_lia = ref true
 let qe = ref true
 let use_ai = ref false
+let iso = ref true
 
 let ctx = ref None
 

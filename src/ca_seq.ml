@@ -406,7 +406,7 @@ and of_cfg ?(indent=0) ?(introduce_assume_false=false) cfg init_ca_loc =
           Debugger.debug "ca_construction" "%s%s%s (%s)" indent indent (pprint to_vertex) (pprint_seq ~sep:"; " tstmt) ;
           let tstmt, to_vertex = rename_max_node_fp g tstmt to_vertex in
           let tstmt, to_vertex =
-            if introduce_assume_false || G.Imp.mem_vertex g to_vertex then
+            if (not !Config.iso) || introduce_assume_false || G.Imp.mem_vertex g to_vertex then
               tstmt, to_vertex
             else
               match find_isomorphic_heap g to_vertex with

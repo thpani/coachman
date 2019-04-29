@@ -57,6 +57,7 @@ let main () =
       ), "Enable debugging" ;
     "-notime", Arg.Clear Debugger.print_time, "Omit elapsed time from log messages" ;
     "-ai", Arg.Set Config.use_ai, "Enable SCC pruning using abstract interpretation" ;
+    "-no_iso", Arg.Clear Config.iso, "Disable matching isomorphic heaps" ;
     "-no_qflia", Arg.Clear Config.qf_lia, "Disable fixing Z3 to QF_LIA" ;
     "-no_qe", Arg.Clear Config.qe, "Disable quantifier elimination in transition relation computation" ;
     "-f", Arg.Set_string func , "Specify function to analyze. If not given, a program choosing non-deterministically among all declared functions will be generated."
