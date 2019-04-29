@@ -37,8 +37,7 @@ let suite = "Michael-Scott" >::: [
       16, Scfg.E "enq_swing", 3, Complexity.Const 1 ;
       16, Scfg.effect_ID,     3, Complexity.Const 0 ;
     ] ;
-  "enq || G(enq) nolag" >: test_case ~length:Long (
-    test ~ai:true "ms"
+  "enq || G(enq) nolag" >:: test ~ai:true "ms"
     "ms.tiny" "ms_nolag.heap" "ms/ms.summaries" "enq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
@@ -53,9 +52,8 @@ let suite = "Michael-Scott" >::: [
       10, Scfg.effect_ID,     2, Complexity.Const 1 ;
       16, Scfg.E "enq_swing", 3, Complexity.Linear "N" ;
       16, Scfg.effect_ID,     3, Complexity.Linear "N" ;
-    ] ) ;
-  "enq || G(enq)" >: test_case ~length:Long (
-    test ~ai:true "ms"
+    ] ;
+  "enq || G(enq)" >:: test ~ai:true "ms"
     "ms.tiny" "ms.heap" "ms/ms.summaries" "enq" [
        0, Scfg.effect_ID,     3, Complexity.Const 1 ;
        3, Scfg.effect_ID,     4, Complexity.Linear "N" ;
@@ -70,7 +68,7 @@ let suite = "Michael-Scott" >::: [
       10, Scfg.effect_ID,     2, Complexity.Const 1 ;
       16, Scfg.E "enq_swing", 3, Complexity.Linear "N" ;
       16, Scfg.effect_ID,     3, Complexity.Linear "N" ;
-    ] ) ;
+    ] ;
   (* }}} *)
   (* deq {{{ *)
   "deq (empty) nolag" >:: test "ms"
