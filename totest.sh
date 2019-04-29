@@ -12,5 +12,6 @@ read -d '' awkScript <<'EOF'
 EOF
 
 grep -- '->' | \
+  gsed 's!^[[:digit:]]\{2\}:[[:digit:]]\{2\}:[[:digit:]]\{2\}\s!!' | \
   gsed 's!(\|)\|:! !g' | \
   awk "$awkScript"
