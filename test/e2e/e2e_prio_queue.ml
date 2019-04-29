@@ -3,7 +3,7 @@ open OUnit2
 open E2e
 
 let suite = "PriorityQueue" >::: [
-  "(add [] removeMin) || G(Add1) || G(Add2) || G(Remove1) || G(Remove2)" >::
+  "(add [] removeMin) || G(Add1) || G(Add2) || G(Remove1) || G(Remove2)" >: test_case ~length:Long (
     test "prio_queue" "prio_queue.tiny" "prio_queue.heap"
     "prio_queue/prio_queue.summaries" "" [
       0, Scfg.effect_ID, 1, Complexity.Const 1 ;
@@ -31,5 +31,5 @@ let suite = "PriorityQueue" >::: [
       37, Scfg.effect_ID, 32, Complexity.Linear "N" ;
       33, Scfg.effect_ID, -1, Complexity.Const 1 ;
       37, Scfg.E "Remove2", -1, Complexity.Const 1 ;
-    ] ;
+    ] ) ;
 ]
