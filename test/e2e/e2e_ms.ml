@@ -138,7 +138,7 @@ let suite = "Michael-Scott" >::: [
   (* }}} *)
   (* enq [] deq {{{ *)
   "(enq [] deq) || G(deq) || G(enq)" >:
-		test_case ~length:Long (test "ms"
+		test_case ~length:Long (test ~ai:true "ms"
     "ms.tiny" "ms.heap" "ms/ms.summaries" "" [
       0, Scfg.effect_ID, 1, Complexity.Const 1 ;
       0, Scfg.effect_ID, 24, Complexity.Const 1 ;
