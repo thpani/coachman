@@ -104,3 +104,29 @@ module Vertex = struct
 end
 
 (* }}} *)
+
+(* permutation {{{ *)
+
+let permute heap permutation =
+  let elements = NodeSet.elements heap.nodes in
+  let permuted_node = function
+    | 0 -> 0
+    | node ->
+        let index = Util.List.find node elements in
+        List.nth permutation index
+  in
+  let nodes = heap.nodes in
+  let succ = NodeMap.fold (fun from to_ permuted_map ->
+    let permuted_from = permuted_node from in
+    let permuted_to = permuted_node to_ in
+    NodeMap.add permuted_from permuted_to permuted_map
+  ) heap.succ NodeMap.empty
+  in
+  let var = VariableMap.fold (fun var node permuted_map ->
+    let permuted_node = permuted_node node in
+    VariableMap.add var permuted_node permuted_map
+  ) heap.var VariableMap.empty
+  in
+  { nodes ; succ ; var }
+
+(* }}} *)
