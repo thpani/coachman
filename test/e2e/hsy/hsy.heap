@@ -1,0 +1,64 @@
+0 (Empty, State, ToS),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop) 1;
+
+0 (Empty, ToS),
+1 0 (WaitingPush, State) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop) 1;
+
+0 (Empty, ToS),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush, State) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop) 1;
+
+0 (Empty, ToS),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop, State) 1,
+4 0 (BusyPop) 1;
+
+0 (Empty, ToS),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop, State) 1;
+
+0 (Empty, State),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop) 1,
+5 0 (ToS);
+
+0 (Empty),
+1 0 (WaitingPush, State) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop) 1,
+5 0 (ToS);
+
+0 (Empty),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush, State) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop) 1,
+5 0 (ToS);
+
+0 (Empty),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop, State) 1,
+4 0 (BusyPop) 1,
+5 0 (ToS);
+
+0 (Empty),
+1 0 (WaitingPush) 1,
+2 0 (BusyPush) 1,
+3 0 (WaitingPop) 1,
+4 0 (BusyPop, State) 1,
+5 0 (ToS);

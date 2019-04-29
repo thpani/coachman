@@ -1,0 +1,67 @@
+def push begin
+  node := new;
+  while true do
+    top := ToS;
+    node.next := top;
+    if CAS(ToS, top, node, Push) then
+      break;
+    fi
+    state := State;
+    if state = Empty then
+      if CAS(State, state, WaitingPush, SetWaitingPush) then
+        if State = BusyPop then
+          CAS(State, State, Empty, SetEmpty);
+          break;
+        else
+          if CAS(State, WaitingPush, Empty, SetEmpty) then
+            continue;
+          else
+            CAS(State, State, Empty, SetEmpty);
+            break;
+          fi
+        fi
+      fi
+    else
+      if state = WaitingPop then
+        if CAS(State, state, BusyPush, SetBusyPush) then
+          break;
+        fi
+      fi
+    fi
+  od
+end
+
+def pop begin
+  while true do
+    top := ToS;
+    if top = null then
+      break;
+    fi
+    node := top.next;
+    if CAS(ToS, top, node, Pop) then
+      break;
+    fi
+    state := State;
+    if state = Empty then
+      if CAS(State, state, WaitingPop, SetWaitingPop) then
+        if State = BusyPush then
+          CAS(State, State, Empty, SetEmpty);
+          break;
+        else
+          if CAS(State, WaitingPop, Empty, SetEmpty) then
+            continue;
+          else
+            CAS(State, State, Empty, SetEmpty);
+            break;
+          fi
+        fi
+      fi
+    else
+      if state = WaitingPush then
+        if CAS(State, state, BusyPop, SetBusyPop) then
+          break;
+        fi
+      fi
+    fi
+  od
+end

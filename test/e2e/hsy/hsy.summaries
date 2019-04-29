@@ -1,0 +1,35 @@
+def Push begin
+  __node := new;
+  __node.next := ToS;
+  ToS := __node;
+  __node := null;
+end
+
+def Pop begin
+  assume(!(ToS = null));
+  ToS := ToS.next;
+end
+
+def SetWaitingPush begin
+  assume(State = Empty);
+  State := WaitingPush;
+end
+
+def SetBusyPush begin
+  assume(State = WaitingPop);
+  State := BusyPush;
+end
+
+def SetWaitingPop begin
+  assume(State = Empty);
+  State := WaitingPop;
+end
+
+def SetBusyPop begin
+  assume(State = WaitingPush);
+  State := BusyPop;
+end
+
+def SetEmpty begin
+  State := Empty;
+end
