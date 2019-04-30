@@ -3,7 +3,7 @@ open OUnit2
 
 open E2e
 
-let suite = "DGLM" >::: [
+let tests = [
   (* enq {{{ *)
   "enq (empty) nolag" >:: test "dglm"
     "dglm.tiny" "dglm_nolag.heap" "empty.summaries" "enq" [
@@ -138,6 +138,9 @@ let suite = "DGLM" >::: [
       12, Scfg.E "deq_swing",  1, Complexity.Const 1 ;
     ] ;
   (* }}} *)
+]
+
+let tests_huge = tests @ [
   (* enq [] deq {{{ *)
   "(enq [] deq) || G(deq) || G(enq)" >:
     test_case ~length:Huge (test ~ai:true "dglm"
@@ -173,3 +176,6 @@ let suite = "DGLM" >::: [
     ] ) ;
   (* }}} *)
 ]
+
+let suite huge = "DGLM" >:::
+  if huge then tests_huge else tests

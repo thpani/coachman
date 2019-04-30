@@ -8,7 +8,7 @@ homepage: "https://github.com/thpani/coachman"
 bug-reports: "https://github.com/thpani/coachman/issues"
 dev-repo: "git+https://github.com/thpani/coachman"
 build: make
-build-test: [make "test"]
+build-test: [make "huge=-no-huge" "test"]
 install: [make "prefix=%{prefix}%" "install"]
 remove: [make "prefix=%{prefix}%" "uninstall"]
 depends: [

@@ -26,7 +26,7 @@ test_unit: unit
 test_e2e: e2e
 	DYLD_LIBRARY_PATH=`opam config var z3:lib` \
 	LD_LIBRARY_PATH=`opam config var z3:lib` \
-	./e2e_all.native
+	./e2e_all.native $(huge)
 
 test: test_unit test_e2e
 

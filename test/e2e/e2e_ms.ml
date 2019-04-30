@@ -3,7 +3,7 @@ open OUnit2
 
 open E2e
 
-let suite = "Michael-Scott" >::: [
+let tests = [
   (* enq {{{ *)
   "enq (empty) nolag" >:: test "ms"
     "ms.tiny" "ms_nolag.heap" "empty.summaries" "enq" [
@@ -138,6 +138,9 @@ let suite = "Michael-Scott" >::: [
       16, Scfg.E "deq",       1, Complexity.Const 1 ;
     ] ;
   (* }}} *)
+]
+
+let tests_huge = tests @ [
   (* enq [] deq {{{ *)
   "(enq [] deq) || G(deq) || G(enq)" >:
 		test_case ~length:Huge (test ~ai:true "ms"
@@ -174,3 +177,5 @@ let suite = "Michael-Scott" >::: [
   (* }}} *)
 ]
 
+let suite huge = "Michael-Scott" >:::
+  if huge then tests_huge else tests
