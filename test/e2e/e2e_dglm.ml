@@ -140,7 +140,7 @@ let suite = "DGLM" >::: [
   (* }}} *)
   (* enq [] deq {{{ *)
   "(enq [] deq) || G(deq) || G(enq)" >:
-    test_case ~length:Long (test ~ai:true "dglm"
+    test_case ~length:Huge (test ~ai:true "dglm"
     "dglm.tiny" "dglm.heap" "dglm/dglm.summaries" "" [
 			0, Scfg.effect_ID, 1, Complexity.Const 1 ;
 			0, Scfg.effect_ID, 24, Complexity.Const 1 ;
