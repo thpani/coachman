@@ -1,0 +1,17 @@
+def procedure begin
+  newA := new;
+  newB := new;
+  newC := new;
+  while true do
+    a := A;
+    if CAS(A, a, newA, ModifyA) then
+      b := B;
+      if CAS(B, b, newB, ModifyB) then
+        c := C;
+        if CAS(C, c, newC, ModifyC) then
+          break;
+        fi
+			fi
+		fi
+	od
+end
