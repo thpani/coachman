@@ -83,6 +83,7 @@ let rec from_ast_bexpr = function
   | Ast.Neg a -> Neg (from_ast_bexpr a)
   | Ast.And (a, b) -> And (from_ast_bexpr a, from_ast_bexpr b)
   | Ast.CAS _ -> raise (Invalid_argument "CAS should have been rewritten as atomic assume/assign")
+  | Ast.DCAS _ -> raise (Invalid_argument "DCAS should have been rewritten as atomic assume/assign")
 
 let from_ast_stmt = function
   | Ast.Assume b -> Assume (from_ast_bexpr b)
@@ -198,6 +199,10 @@ let of_ast ast =
                 Atomic [ Assume (Eq(a, Id b)) ; Asgn(a, Id c) ],
                 Scfg.E d,
                 Atomic [ Assume(Neg(Eq(a, Id b))) ]
+            | DCAS (a,b,c,d,e,f) ->
+                Atomic [ Assume(And(Eq(a, Id b), Eq(c, Id d))); Asgn(a, Id e) ],
+                Scfg.E f,
+                Atomic [ Assume(Neg(And(Eq(a, Id b), (Eq(c, Id d))))) ]
             | Nondet ->
               Assume True, Scfg.effect_ID, Assume True
             | _ -> Assume guard, Scfg.effect_ID, Assume (Neg guard)

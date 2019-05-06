@@ -27,6 +27,7 @@
 %token NEG
 %token EOF
 %token CAS
+%token DCAS
 %token COMMA
 %token LPAREN
 %token RPAREN
@@ -65,6 +66,7 @@ statement:
   | ID ASGN pexpr_null SEMI                   { Asgn (Id $1, $3) }
   | ID NEXT ASGN pexpr_null SEMI              { Asgn (Next $1, $4) }
   | CAS LPAREN pexpr COMMA ID COMMA ID COMMA ID RPAREN SEMI { IfThenElse(CAS($3, $5, $7, $9), [], []) }
+  | DCAS LPAREN pexpr COMMA ID COMMA pexpr COMMA ID COMMA ID COMMA ID RPAREN SEMI { IfThenElse(DCAS($3, $5, $7, $9, $11, $13), [], []) }
   ;
 
 pexpr:
@@ -84,4 +86,5 @@ bexpr:
   | pexpr EQ pexpr_null    { Eq($1, $3) }
   | NEG LPAREN bexpr RPAREN   { Neg($3) }
   | CAS LPAREN pexpr COMMA ID COMMA ID COMMA ID RPAREN    { CAS ($3, $5, $7, $9) }
+  | DCAS LPAREN pexpr COMMA ID COMMA pexpr COMMA ID  COMMA ID COMMA ID RPAREN { DCAS ($3, $5, $7, $9, $11, $13) }
   ;

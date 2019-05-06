@@ -15,6 +15,7 @@ type bexpr =
   | Neg of bexpr
   | And of bexpr * bexpr
   | CAS of pexpr * identifier * identifier * identifier
+  | DCAS of pexpr * identifier * pexpr * identifier * identifier * identifier
 
 type stmt =
   | Atomic of stmt list
@@ -48,6 +49,7 @@ let rec pprint_bexpr = function
   | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
   | And (a, b) -> Printf.sprintf "(%s && %s)" (pprint_bexpr a) (pprint_bexpr b)
   | CAS (a, b, c, _) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
+  | DCAS (a, b, c, d, e, _) -> Printf.sprintf "DCAS(%s, %s, %s, %s, %s)" (pprint_pexpr a) b (pprint_pexpr c) d e
 
 let rec pprint_stmt ?(sep=";\n") = function
   | Atomic s -> Printf.sprintf "< %s >" (pprint_seq ~sep:"; " s)

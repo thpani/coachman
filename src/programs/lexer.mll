@@ -28,6 +28,7 @@ rule token = parse
   | "continue" { CONTINUE }
   | "return" { RETURN }
   | "CAS" { CAS }
+  | "DCAS" { DCAS }
   | "true" { TRUE }
   | "false" { FALSE }
   | "assume" { ASSUME }
