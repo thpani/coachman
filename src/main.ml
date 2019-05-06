@@ -55,11 +55,11 @@ let main () =
         Debugger.current_level := Debugger.Debug ;
         Debugger.current_components := (String.split_on_char ',' s)
       ), "Enable debugging" ;
-    "-notime", Arg.Clear Debugger.print_time, "Omit elapsed time from log messages" ;
-    "-ai", Arg.Set Config.use_ai, "Enable SCC pruning using abstract interpretation" ;
-    "-no_iso", Arg.Clear Config.iso, "Disable matching isomorphic heaps" ;
-    "-no_qflia", Arg.Clear Config.qf_lia, "Disable fixing Z3 to QF_LIA" ;
-    "-no_qe", Arg.Clear Config.qe, "Disable quantifier elimination in transition relation computation" ;
+    "-ai", Arg.Set Config.use_ai, "Enable SCC pruning using abstract interpretation during bound analysis" ;
+    "-no-iso", Arg.Clear Config.iso, "Disable matching isomorphic heaps" ;
+    "-no-qflia", Arg.Clear Config.qf_lia, "Disable fixing Z3 to QF_LIA" ;
+    "-no-qe", Arg.Clear Config.qe, "Disable quantifier elimination in transition relation computation" ;
+    "-no-time", Arg.Clear Debugger.print_time, "Omit elapsed time from log messages" ;
     "-f", Arg.Set_string func , "Specify function to analyze. If not given, a program choosing non-deterministically among all declared functions will be generated."
   ] (fun s -> args := s :: !args) usage
   ;
