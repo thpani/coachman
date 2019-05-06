@@ -1,0 +1,29 @@
+# Adapted from the CAVE distribution at https://people.mpi-sws.org/~viktor/cave/
+#   examples/DCAS_stack.cav
+#
+# A variant of Treiber's stack, which uses a DCAS instead of a CAS for
+# pushing an element onto the stack.
+
+def push begin
+  node := new;
+  while true do
+    top := ToS;
+    node.next := top;
+    if CAS(ToS, top, node, push) then
+      break;
+    fi
+  od
+end
+
+def pop begin
+  while true do
+    top := ToS;
+    if top = null then
+      return;
+    fi
+    node := top.next;
+    if DCAS(ToS, top, top.next, node, node, pop) then
+      break;
+    fi
+  od
+end
