@@ -14,6 +14,7 @@ type bexpr =
   | False
   | Eq of pexpr * pexpr
   | Neg of bexpr
+  | And of bexpr * bexpr
 
 type stmt =
   | Assume of bexpr
@@ -36,6 +37,7 @@ let rec pprint_bexpr = function
   | False -> "false"
   | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
   | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
+  | And (a,b) -> Printf.sprintf "(%s) && (%s)" (pprint_bexpr a) (pprint_bexpr b)
 
 let rec pprint_stmt = function
   | Assume g -> Printf.sprintf "assume(%s)" (pprint_bexpr g)
@@ -79,6 +81,7 @@ let rec from_ast_bexpr = function
   | Ast.Nondet -> raise (Invalid_argument "Nondet should have been rewritten as assume")
   | Ast.Eq (a, b) -> Eq (from_ast_pexpr a, from_ast_pexpr b)
   | Ast.Neg a -> Neg (from_ast_bexpr a)
+  | Ast.And (a, b) -> And (from_ast_bexpr a, from_ast_bexpr b)
   | Ast.CAS _ -> raise (Invalid_argument "CAS should have been rewritten as atomic assume/assign")
 
 let from_ast_stmt = function
@@ -99,6 +102,7 @@ let rec to_ast_bexpr = function
   | False -> Ast.False
   | Eq (a, b) -> Ast.Eq (to_ast_pexpr a, to_ast_pexpr b)
   | Neg a ->  Ast.Neg (to_ast_bexpr a)
+  | And (a, b) -> Ast.And (to_ast_bexpr a, to_ast_bexpr b)
 
 let to_ast_stmt = List.map (function
   | Assume b -> Ast.Assume (to_ast_bexpr b)
@@ -142,6 +146,10 @@ and precompile_stmt =
       let la, a' = precompile_pexpr a in
       let lb, b' = precompile_pexpr b in
         la @ lb, Eq (a',b')
+    | And (a,b) ->
+      let la, a' = precompile_bexpr a in
+      let lb, b' = precompile_bexpr b in
+        la @ lb, And (a',b')
   in
   function
   | Assume g -> begin

@@ -13,6 +13,7 @@ type bexpr =
   | Nondet
   | Eq of pexpr * pexpr
   | Neg of bexpr
+  | And of bexpr * bexpr
   | CAS of pexpr * identifier * identifier * identifier
 
 type stmt =
@@ -45,6 +46,7 @@ let rec pprint_bexpr = function
   | Nondet -> "*"
   | Eq (a, b) -> Printf.sprintf "(%s) = (%s)" (pprint_pexpr a) (pprint_pexpr b)
   | Neg g     -> Printf.sprintf "!(%s)" (pprint_bexpr g)
+  | And (a, b) -> Printf.sprintf "(%s && %s)" (pprint_bexpr a) (pprint_bexpr b)
   | CAS (a, b, c, _) -> Printf.sprintf "CAS(%s, %s, %s)" (pprint_pexpr a) b c
 
 let rec pprint_stmt ?(sep=";\n") = function

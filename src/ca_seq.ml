@@ -89,6 +89,7 @@ let rec get_next (lfrom, hfrom) stmts summary lto =
       | False -> false
       | Neg g -> not(simplify_guard g)
       | Eq (a,b) -> var_eq a b
+      | And (a,b) -> (simplify_guard a) && (simplify_guard b)
   in
   let project_onto s n =  NodeMap.filter (fun a _ -> NodeSet.mem a n) s in
   let reaches w n s =
