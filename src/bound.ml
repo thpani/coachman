@@ -585,7 +585,7 @@ let compute_bound_for_init_heap get_edge_color ctx cfg i (init_ca_loc, constrain
   while !iteration > 0 do
     Debugger.info "bound" "  Iteration %d, initial state: %s\n%!" !iteration (pprint_env_bound_map ctx !env_bound_map) ;
 
-    let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map (init_ca_loc,init_abs_map) in
+    let ca_local_bound_map = get_local_bounds ctx man env vars !ca abs_map (init_ca_loc, init_abs_map) in
     Debugger.debug "bound" "  Accumulating local bounds\n%!" ;
     let get_ca_local_bounds f t ek = List.fold_left (fun l ((f',ek',t'),lb) ->
       if f'=f && t'=t && ek' = ek then lb :: l else l
